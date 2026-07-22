@@ -2675,19 +2675,38 @@
             });
             return {produkSet,hasFitri,salesName,modalTotal,modalAda,items};
         }
-        function cariSalesMatch(noFaktur, tglAcuan){
+        function distinctCustomers(rows){
+            const set=new Set();
+            rows.forEach(r => { const c=(r.Customer||'').trim().toLowerCase(); if(c) set.add(c); });
+            return set;
+        }
+        function cariSalesMatch(noFaktur, tglAcuan, namaTokoAcuan){
             const key=normFaktur(noFaktur);
             if(!key) return null;
             const kandidat=salesByFakturRaw.get(key);
             if(!kandidat || !kandidat.length) return null;
-            const refKey=toDateKey(tglAcuan);
             let dipakai=kandidat;
+            // PENTING: No.Faktur bisa dipakai ulang untuk CUSTOMER YANG BERBEDA (mis. penomoran
+            // reset tiap bulan). Kalau langsung digabung tanpa cek nama customer, Harga Beli
+            // milik transaksi customer lain bisa ikut kehitung sebagai Modal faktur ini, dan
+            // bikin Profit jadi salah total (bisa minus besar padahal sudah Lunas).
+            // Jadi: kalau No.Faktur ini dipakai oleh lebih dari satu customer berbeda di Bank
+            // Data Penjualan, wajib cocokkan dulu nama customer/toko-nya sebelum dipakai.
+            const namaTokoNorm=(namaTokoAcuan||'').trim().toLowerCase();
+            const customerSet=distinctCustomers(kandidat);
+            if(customerSet.size>1){
+                if(!namaTokoNorm) return null;
+                const samaCustomer=kandidat.filter(r=>(r.Customer||'').trim().toLowerCase()===namaTokoNorm);
+                if(!samaCustomer.length) return null;
+                dipakai=samaCustomer;
+            }
+            const refKey=toDateKey(tglAcuan);
             if(refKey){
-                const persisSama=kandidat.filter(r=>r.Tanggal===refKey);
+                const persisSama=dipakai.filter(r=>r.Tanggal===refKey);
                 if(persisSama.length) dipakai=persisSama;
                 else {
                     const refBulan=refKey.slice(0,7);
-                    const bulanSama=kandidat.filter(r=>(r.Tanggal||'').slice(0,7)===refBulan);
+                    const bulanSama=dipakai.filter(r=>(r.Tanggal||'').slice(0,7)===refBulan);
                     if(bulanSama.length) dipakai=bulanSama;
                 }
             }
@@ -2698,7 +2717,7 @@
             const days=cashDataMap[bulan]||[];
             days.forEach(day => {
                 (day.piutangDetail||[]).forEach(d => {
-                    const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal);
+                    const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal, d.namaToko);
                     const isFitri=salesMatch?salesMatch.hasFitri:((d.ket||'').toLowerCase().includes('minyak')||(d.namaToko||'').toLowerCase().includes('fitri'));
                     const produkGabungan=salesMatch&&salesMatch.produkSet.size>0?Array.from(salesMatch.produkSet).join(', '):(d.produk||(isFitri?'Minyak Fitri':'Rupa-Rupa'));
                     const salesNama=salesMatch&&salesMatch.salesName?salesMatch.salesName:(d.sales||'-');
@@ -2726,7 +2745,7 @@
                     piutangUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,jatuhTempo:d.jt||'-',totalBayar,sisaTagihan,statusClass,overdueDays,tglBayar,profit,modalTotal,modalAda,proporsiBayar,modalProporsional,profitKotorTotal,sisaModalTertahan,estimasiProfitSisa,profitItems,_bulan:bulan,_tanggalHari:day.tanggal,_id:piutangUangMasukData.length});
                 });
                 (day.cashDroppingDetail||[]).forEach(d => {
-                    const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal);
+                    const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal, d.namaToko);
                     const isFitri=salesMatch?salesMatch.hasFitri:((d.ket||'').toLowerCase().includes('minyak')||(d.namaToko||'').toLowerCase().includes('fitri'));
                     const salesNama=salesMatch&&salesMatch.salesName?salesMatch.salesName:(d.sales||d.dropping_sales||'-');
                     const produkGabungan=salesMatch&&salesMatch.produkSet.size>0?Array.from(salesMatch.produkSet).join(', '):(d.produk||(isFitri?'Minyak Fitri':'Rupa-Rupa'));
@@ -2851,7 +2870,7 @@
         document.getElementById('pumSumProfit').className='value '+(totalProfit<0?'orange':'');
         const noteEl=document.getElementById('pumSumProfitNote');
         noteEl.style.display=countProfitMissing>0?'block':'none';
-        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada)`:'';
+        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
     }
     let piutangUangMasukViewMode = localStorage.getItem('pumViewMode')==='card'?'card':'table';
     function pumApplyViewModeUI() {
@@ -3030,7 +3049,7 @@
         document.getElementById('cddSumProfit').className='value '+(totalProfit<0?'orange':'');
         const noteEl=document.getElementById('cddSumProfitNote');
         noteEl.style.display=countProfitMissing>0?'block':'none';
-        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada)`:'';
+        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
     }
     let cashDroppingUangMasukViewMode = localStorage.getItem('cddViewMode')==='card'?'card':'table';
     function cddApplyViewModeUI() {
