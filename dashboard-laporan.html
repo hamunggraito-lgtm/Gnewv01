@@ -1071,6 +1071,33 @@
 
     <!-- ======= TAB 10 – CASH DROPPING (Dari Data Uang Masuk) ======= -->
     <div class="tab-content" id="tab10">
+        <div class="cards" id="cashDroppingUangMasukSummaryCards" style="margin-bottom:10px;">
+            <div class="card" style="min-width:130px;">
+                <div class="label">Periode</div>
+                <div class="value" id="cddSumPeriode" style="font-size:12px;">Semua Periode</div>
+            </div>
+            <div class="card" style="min-width:110px;">
+                <div class="label">Jumlah Faktur</div>
+                <div class="value" id="cddSumCountFaktur">0 faktur</div>
+            </div>
+            <div class="card" style="min-width:130px;">
+                <div class="label">Total Nominal</div>
+                <div class="value" id="cddSumTagihan">Rp 0</div>
+            </div>
+            <div class="card" style="min-width:130px;">
+                <div class="label">Total Cash</div>
+                <div class="value" id="cddSumCash">Rp 0</div>
+            </div>
+            <div class="card" style="min-width:130px;">
+                <div class="label">Total Transfer</div>
+                <div class="value" id="cddSumTransfer">Rp 0</div>
+            </div>
+            <div class="card" style="min-width:150px;">
+                <div class="label">💰 Total Profit Real</div>
+                <div class="value" id="cddSumProfit">Rp 0</div>
+                <div id="cddSumProfitNote" style="display:none; font-size:8px; color:rgba(255,255,255,0.85); font-weight:600;"></div>
+            </div>
+        </div>
         <div class="filter-bar">
             <div class="field" style="min-width:150px;"><label>Cari Faktur/Customer</label><input type="text" id="cashDroppingUangMasukSearch" placeholder="No faktur / nama toko..."></div>
             <div class="field"><label>Tanggal</label><input type="date" id="cashDroppingUangMasukTanggal"></div>
@@ -1078,9 +1105,10 @@
             <div class="field"><label>Sales</label><select id="cashDroppingUangMasukSales"><option value="">Semua</option></select></div>
             <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn btn-reset" id="cashDroppingUangMasukBtnReset">↺ Reset</button></div>
             <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn" id="cashDroppingUangMasukBtnRefresh">🔄 Muat Ulang</button></div>
+            <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn btn-outline" id="cashDroppingUangMasukViewToggle">🗂️ Mode Kartu</button></div>
             <span class="info-right" id="cashDroppingUangMasukInfo">0 data</span>
         </div>
-        <div class="table-wrap" style="height:450px; max-height:450px;">
+        <div class="table-wrap" id="cashDroppingUangMasukTableWrap" style="height:450px; max-height:450px;">
             <table>
                 <thead>
                     <tr>
@@ -1094,12 +1122,14 @@
                         <th class="num">Nominal</th>
                         <th class="num">Bayar Cash</th>
                         <th class="num">Bayar Transfer</th>
+                        <th class="num">Profit</th>
                         <th>Keterangan</th>
                     </tr>
                 </thead>
-                <tbody id="cashDroppingUangMasukBody"><tr><td colspan="11" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr></tbody>
+                <tbody id="cashDroppingUangMasukBody"><tr><td colspan="12" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr></tbody>
             </table>
         </div>
+        <div class="pt-card-list" id="cashDroppingUangMasukCardList" style="display:none;"></div>
         <div class="pagination" id="cashDroppingUangMasukPager">
             <div><button id="cashDroppingUangMasukPrevPage" disabled>◀ Sebelumnya</button><span id="cashDroppingUangMasukPageLabel">Halaman 1 dari 1</span><button id="cashDroppingUangMasukNextPage" disabled>Berikutnya ▶</button></div>
             <div><span class="badge-count" id="cashDroppingUangMasukTotalData">0 data</span></div>
@@ -2697,12 +2727,34 @@
                     const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal);
                     const isFitri=salesMatch?salesMatch.hasFitri:((d.ket||'').toLowerCase().includes('minyak')||(d.namaToko||'').toLowerCase().includes('fitri'));
                     const salesNama=salesMatch&&salesMatch.salesName?salesMatch.salesName:(d.sales||d.dropping_sales||'-');
-                    cashDroppingUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',_bulan:bulan,_tanggalHari:day.tanggal});
+                    const produkGabungan=salesMatch&&salesMatch.produkSet.size>0?Array.from(salesMatch.produkSet).join(', '):(d.produk||(isFitri?'Minyak Fitri':'Rupa-Rupa'));
+                    const tagihanCdd=d.tagihan||0;
+                    const totalBayarCdd=d.totalBayar!=null?d.totalBayar:((d.bayarCash||0)+(d.bayarTransfer||0));
+                    const modalTotalCdd=salesMatch?salesMatch.modalTotal:0;
+                    const modalAdaCdd=salesMatch?salesMatch.modalAda:false;
+                    const proporsiBayarCdd=tagihanCdd>0?Math.max(0,Math.min(1,totalBayarCdd/tagihanCdd)):(totalBayarCdd>0?1:0);
+                    const modalProporsionalCdd=modalAdaCdd?(proporsiBayarCdd*modalTotalCdd):0;
+                    const profitCdd=modalAdaCdd?(totalBayarCdd-modalProporsionalCdd):'';
+                    const profitKotorTotalCdd=modalAdaCdd?(tagihanCdd-modalTotalCdd):'';
+                    const sisaModalTertahanCdd=modalAdaCdd?(modalTotalCdd-modalProporsionalCdd):'';
+                    const sisaTagihanCdd=Math.max(0,tagihanCdd-totalBayarCdd);
+                    const estimasiProfitSisaCdd=modalAdaCdd?(sisaTagihanCdd-sisaModalTertahanCdd):'';
+                    cashDroppingUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,tagihan:tagihanCdd,totalBayar:totalBayarCdd,sisaTagihan:sisaTagihanCdd,modalTotal:modalTotalCdd,modalAda:modalAdaCdd,proporsiBayar:proporsiBayarCdd,modalProporsional:modalProporsionalCdd,profit:profitCdd,profitKotorTotal:profitKotorTotalCdd,sisaModalTertahan:sisaModalTertahanCdd,estimasiProfitSisa:estimasiProfitSisaCdd,profitItems:salesMatch?salesMatch.items:[],_bulan:bulan,_tanggalHari:day.tanggal,_id:cashDroppingUangMasukData.length});
                 });
             });
         }
-        piutangUangMasukData.sort((a,b)=>(b.tglFaktur||'').localeCompare(a.tglFaktur||''));
-        cashDroppingUangMasukData.sort((a,b)=>(b.tglFaktur||'').localeCompare(a.tglFaktur||''));
+        function pumSortDate(d){
+            const parsed=ptParseDMY(d.tglFaktur);
+            if(parsed) return parsed.getTime();
+            if(d._bulan && d._tanggalHari){
+                const [thn,bln]=d._bulan.split('-'); const hariPart=String(d._tanggalHari).split('-')[0];
+                const alt=new Date(parseInt(thn),parseInt(bln)-1,parseInt(hariPart));
+                if(!isNaN(alt.getTime())) return alt.getTime();
+            }
+            return 0;
+        }
+        piutangUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
+        cashDroppingUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
     }
 
     function updateUangMasukFilterOptions() {
@@ -2857,11 +2909,16 @@
         document.getElementById('badgePiutangUangMasuk').textContent=filtered.length;
     }
 
-    function openPumDetail(id) {
-        const d=piutangUangMasukData.find(row=>row._id===id);
+    function openPumDetail(id, source) {
+        source = source || 'piutang';
+        const dataArr = source==='cash' ? cashDroppingUangMasukData : piutangUangMasukData;
+        const d=dataArr.find(row=>row._id===id);
         if(!d){ showToast('⚠️ Data faktur tidak ditemukan.','warning'); return; }
+        const isTempo = source!=='cash';
         document.getElementById('pumDetailTitle').textContent=`🧾 Detail Faktur - ${d.noFaktur||'-'}`;
-        const statusBadge=d.statusClass==='lunas'?'<span class="stempel-lunas">Lunas</span>':`<span class="badge pt-${d.statusClass}">${d.statusClass==='overdue'&&d.overdueDays!=null?`${d.overdueDays} hr/Overdue`:'Belum Lunas'}</span>`;
+        const statusBadge = isTempo
+            ? (d.statusClass==='lunas'?'<span class="stempel-lunas">Lunas</span>':`<span class="badge pt-${d.statusClass}">${d.statusClass==='overdue'&&d.overdueDays!=null?`${d.overdueDays} hr/Overdue`:'Belum Lunas'}</span>`)
+            : '<span class="badge pt-tercatat">Cash Dropping</span>';
         const items=Array.isArray(d.profitItems)?d.profitItems:[];
         let profitSectionHtml='';
         if(items.length>0){
@@ -2900,6 +2957,13 @@
             profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
                 <div class="pum-warn-box">⚠️ Tidak ditemukan data produk/Harga Beli yang cocok di Bank Data Penjualan untuk faktur ini (kemungkinan No. Faktur belum tercatat di sana), sehingga Profit belum bisa dihitung.</div>`;
         }
+        const infoRowsTempo = isTempo ? `
+                <div><strong>Jatuh Tempo:</strong> ${d.jatuhTempo||'-'}${d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''}</div>
+                <div><strong>Status:</strong> ${statusBadge}</div>
+                <div><strong>Tgl Bayar:</strong> ${d.tglBayar||'-'}</div>` : `
+                <div><strong>Bayar Cash:</strong> ${fmtRp(d.bayarCash||d.minyakCash||0)}</div>
+                <div><strong>Status:</strong> ${statusBadge}</div>
+                <div><strong>Bayar Transfer:</strong> ${fmtRp(d.bayarTransfer||d.minyakTransfer||0)}</div>`;
         document.getElementById('pumDetailBody').innerHTML = `
             <div class="pum-section-title">📋 Informasi Faktur</div>
             <div class="pum-grid">
@@ -2910,10 +2974,8 @@
                 <div><strong>Alamat:</strong> ${d.alamat||'-'}</div>
                 <div><strong>Kategori:</strong> ${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</div>
                 <div style="grid-column:1/-1;"><strong>Produk:</strong> ${d.produk||'-'}</div>
-                <div><strong>Jatuh Tempo:</strong> ${d.jatuhTempo||'-'}${d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''}</div>
-                <div><strong>Status:</strong> ${statusBadge}</div>
-                <div><strong>Tgl Bayar:</strong> ${d.tglBayar||'-'}</div>
-                <div><strong>Keterangan:</strong> ${d.ket||'-'}</div>
+                ${infoRowsTempo}
+                <div style="grid-column:1/-1;"><strong>Keterangan:</strong> ${d.ket||'-'}</div>
             </div>
             <div class="pum-section-title">💵 Ringkasan Tagihan</div>
             <div class="pum-grid">
@@ -2928,16 +2990,76 @@
     document.getElementById('pumDetailClose').addEventListener('click', ()=>{ document.getElementById('pumDetailModal').classList.remove('show'); });
     document.getElementById('pumDetailModal').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('show'); });
 
+    function cddPeriodLabel() {
+        const bulanVal=document.getElementById('cashDroppingUangMasukBulan').value;
+        return bulanVal?fmtBulanTahun(bulanVal):'Semua Periode Ditampilkan';
+    }
+    function cddRenderSummaryCards(filtered) {
+        let totalNominal=0,totalCash=0,totalTransfer=0,totalProfit=0,countProfitMissing=0;
+        filtered.forEach(d=>{
+            totalNominal+=parseNumber(d.tagihan)||0;
+            totalCash+=parseNumber(d.bayarCash)||0;
+            totalTransfer+=parseNumber(d.bayarTransfer)||0;
+            if(d.profit!==''&&d.profit!=null){ totalProfit+=d.profit; } else { countProfitMissing++; }
+        });
+        document.getElementById('cddSumPeriode').textContent=cddPeriodLabel();
+        document.getElementById('cddSumCountFaktur').textContent=filtered.length+' faktur';
+        document.getElementById('cddSumTagihan').textContent=fmtRp(totalNominal);
+        document.getElementById('cddSumCash').textContent=fmtRp(totalCash);
+        document.getElementById('cddSumTransfer').textContent=fmtRp(totalTransfer);
+        document.getElementById('cddSumProfit').textContent=fmtRp(totalProfit);
+        document.getElementById('cddSumProfit').className='value '+(totalProfit<0?'orange':'');
+        const noteEl=document.getElementById('cddSumProfitNote');
+        noteEl.style.display=countProfitMissing>0?'block':'none';
+        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada)`:'';
+    }
+    let cashDroppingUangMasukViewMode = localStorage.getItem('cddViewMode')==='card'?'card':'table';
+    function cddApplyViewModeUI() {
+        const tableWrap=document.getElementById('cashDroppingUangMasukTableWrap');
+        const cardList=document.getElementById('cashDroppingUangMasukCardList');
+        const toggleBtn=document.getElementById('cashDroppingUangMasukViewToggle');
+        if(cashDroppingUangMasukViewMode==='card'){ tableWrap.style.display='none'; cardList.style.display='grid'; toggleBtn.innerHTML='📋 Mode Tabel'; }
+        else { tableWrap.style.display='block'; cardList.style.display='none'; toggleBtn.innerHTML='🗂️ Mode Kartu'; }
+    }
+    function cddRenderCardList(pageRows) {
+        const cardList=document.getElementById('cashDroppingUangMasukCardList');
+        if(pageRows.length===0){ cardList.innerHTML='<div class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</div>'; return; }
+        cardList.innerHTML=pageRows.map(d=>`
+            <div class="pt-card-item" onclick="openPumDetail(${d._id},'cash')">
+                <div class="pt-card-top">
+                    <span class="faktur-link">${d.noFaktur||'-'}</span>
+                    <span class="badge pt-tercatat">Cash</span>
+                </div>
+                <div class="pt-card-row"><span>Customer</span><span>${d.namaToko||'-'}</span></div>
+                <div class="pt-card-row"><span>Sales</span><span>${d.sales||'-'}</span></div>
+                <div class="pt-card-row"><span>Tanggal</span><span>${d.tglFaktur||'-'}</span></div>
+                <div class="pt-card-row"><span>Nominal</span><span>${fmtRp(d.tagihan)}</span></div>
+                <div class="pt-card-row"><span>Bayar Cash</span><span>${fmtRp(d.bayarCash)}</span></div>
+                <div class="pt-card-row"><span>Bayar Transfer</span><span>${fmtRp(d.bayarTransfer)}</span></div>
+                <div class="pt-card-row highlight"><span>Profit</span><span>${pumProfitCellHtml(d)}</span></div>
+            </div>
+        `).join('');
+    }
+    document.getElementById('cashDroppingUangMasukViewToggle').addEventListener('click', function(){
+        cashDroppingUangMasukViewMode = cashDroppingUangMasukViewMode==='card'?'table':'card';
+        localStorage.setItem('cddViewMode', cashDroppingUangMasukViewMode);
+        cddApplyViewModeUI();
+        renderCashDroppingUangMasuk();
+    });
+
     function renderCashDroppingUangMasuk() {
         const filtered=getFilteredCashDroppingUangMasuk();
+        cddRenderSummaryCards(filtered);
+        cddApplyViewModeUI();
         const totalPages=Math.max(1,Math.ceil(filtered.length/UANG_MASUK_ROWS_PER_PAGE));
         if(cashDroppingUangMasukPage>totalPages) cashDroppingUangMasukPage=totalPages;
         if(cashDroppingUangMasukPage<1) cashDroppingUangMasukPage=1;
         const start=(cashDroppingUangMasukPage-1)*UANG_MASUK_ROWS_PER_PAGE;
         const pageRows=filtered.slice(start,start+UANG_MASUK_ROWS_PER_PAGE);
         const tbody=document.getElementById('cashDroppingUangMasukBody');
-        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="11" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr>'; }
-        else { tbody.innerHTML=pageRows.map((d,i)=>`<tr><td>${start+i+1}</td><td>${d.tglFaktur||'-'}</td><td>${d.noFaktur||'-'}</td><td>${d.sales||'-'}</td><td>${d.namaToko||'-'}</td><td>${d.alamat||'-'}</td><td>${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</td><td class="num">${fmtRp(d.tagihan)}</td><td class="num">${fmtRp(d.bayarCash)}</td><td class="num">${fmtRp(d.bayarTransfer)}</td><td>${d.ket||'-'}</td></tr>`).join(''); }
+        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="12" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr>'; }
+        else { tbody.innerHTML=pageRows.map((d,i)=>`<tr><td>${start+i+1}</td><td>${d.tglFaktur||'-'}</td><td><span class="faktur-link" onclick="openPumDetail(${d._id},'cash')" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td><td>${d.sales||'-'}</td><td>${d.namaToko||'-'}</td><td>${d.alamat||'-'}</td><td>${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</td><td class="num">${fmtRp(d.tagihan)}</td><td class="num">${fmtRp(d.bayarCash)}</td><td class="num">${fmtRp(d.bayarTransfer)}</td><td class="num">${pumProfitCellHtml(d)}</td><td>${d.ket||'-'}</td></tr>`).join(''); }
+        cddRenderCardList(pageRows);
         document.getElementById('cashDroppingUangMasukPageLabel').textContent=`Halaman ${cashDroppingUangMasukPage} dari ${totalPages}`;
         document.getElementById('cashDroppingUangMasukPrevPage').disabled=cashDroppingUangMasukPage<=1;
         document.getElementById('cashDroppingUangMasukNextPage').disabled=cashDroppingUangMasukPage>=totalPages;
