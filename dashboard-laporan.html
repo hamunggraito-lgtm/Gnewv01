@@ -162,9 +162,9 @@
         #pumDetailModal .pum-section-title { font-weight:700; font-size:11px; color:#1f2937; margin:10px 0 6px 0; padding-bottom:4px; border-bottom:1px solid #e2e8f0; }
         #pumDetailModal .pum-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; font-size:11px; }
         #pumDetailModal .pum-grid > div { padding:2px 0; }
-        #pumDetailModal table.pum-profit-table { width:100%; border-collapse:collapse; font-size:10.5px; margin-top:4px; }
-        #pumDetailModal table.pum-profit-table th { background:#eef2ff; color:#4338ca; padding:5px 7px; text-align:left; border:1px solid #e0e4f5; }
-        #pumDetailModal table.pum-profit-table td { padding:5px 7px; border:1px solid #e8ecf4; }
+        #pumDetailModal table.pum-profit-table { width:100%; border-collapse:collapse; font-size:10.5px; margin-top:4px; min-width:760px; }
+        #pumDetailModal table.pum-profit-table th { background:#eef2ff; color:#4338ca; padding:5px 7px; text-align:left; border:1px solid #e0e4f5; white-space:nowrap; }
+        #pumDetailModal table.pum-profit-table td { padding:5px 7px; border:1px solid #e8ecf4; white-space:nowrap; }
         #pumDetailModal table.pum-profit-table td.num, #pumDetailModal table.pum-profit-table th.num { text-align:right; }
         #pumDetailModal .pum-formula-box { background:#f8fafc; border:1px dashed #c7d2fe; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:11px; line-height:1.7; }
         #pumDetailModal .pum-warn-box { background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:10.5px; color:#92400e; }
@@ -1240,6 +1240,10 @@
     // UTILITY
     // ================================================================
     function fmtRp(n) { n = Math.round(parseNumber(n) || 0); return 'Rp ' + n.toLocaleString('id-ID'); }
+    // Profit yang belum dibayar (barang masih titip/stok) BUKAN kerugian, jadi Profit tidak pernah
+    // ditampilkan minus di layar manapun — nilai negatif ditahan jadi 0 saat ditampilkan (nilai asli
+    // tetap dipakai untuk perhitungan internal lain seperti Sisa Modal Tertahan).
+    function clampProfit(v) { if(v===''||v==null||isNaN(v)) return v; return Math.max(0, v); }
     function fmtNumOnly(n) { n = Math.round(parseNumber(n) || 0); return n ? n.toLocaleString('id-ID') : ''; }
     function parseNumber(v) {
         if (v === null || v === undefined || v === '') return 0;
@@ -2877,13 +2881,14 @@
     }
     function pumProfitCellHtml(d) {
         if(d.profit==='' || d.profit==null) return '<span style="color:#94a3b8;">-</span>';
-        const color=d.profit<0?'#b91c1c':'#15803d';
+        const profitDisplay=clampProfit(d.profit);
         // Persentase dihitung sama seperti di tab Bank Data Penjualan: Profit ÷ Modal (Harga Beli) × 100%.
         // Ini persentase MARKUP faktur tersebut (tetap sama walau baru dibayar sebagian/titip);
         // yang berubah proporsional kalau baru bayar sebagian adalah nominal Rupiah-nya saja.
-        const basisPct=(d.modalTotal>0 && d.profitKotorTotal!=='' && d.profitKotorTotal!=null)?(d.profitKotorTotal/d.modalTotal*100):null;
-        const pctHtml=basisPct!=null?` <span style="font-weight:400;font-size:0.9em;color:${color};">(${basisPct.toFixed(1)}%)</span>`:'';
-        return `<span style="color:${color};font-weight:700;">${fmtRp(d.profit)}</span>${pctHtml}`;
+        const basisPctRaw=(d.modalTotal>0 && d.profitKotorTotal!=='' && d.profitKotorTotal!=null)?(d.profitKotorTotal/d.modalTotal*100):null;
+        const basisPct=basisPctRaw!=null?Math.max(0,basisPctRaw):null;
+        const pctHtml=basisPct!=null?` <span style="font-weight:400;font-size:0.9em;color:#15803d;">(${basisPct.toFixed(1)}%)</span>`:'';
+        return `<span style="color:#15803d;font-weight:700;">${fmtRp(profitDisplay)}</span>${pctHtml}`;
     }
     function pumPeriodLabel() {
         const bulanVal=document.getElementById('piutangUangMasukBulan').value;
@@ -2895,7 +2900,7 @@
             totalTagihan+=parseNumber(d.tagihan)||0;
             totalDibayar+=parseNumber(d.totalBayar)||0;
             totalSisa+=parseNumber(d.sisaTagihan)||0;
-            if(d.profit!==''&&d.profit!=null){ totalProfit+=d.profit; } else { countProfitMissing++; }
+            if(d.profit!==''&&d.profit!=null){ totalProfit+=clampProfit(d.profit); } else { countProfitMissing++; }
         });
         document.getElementById('pumSumPeriode').textContent=pumPeriodLabel();
         document.getElementById('pumSumCountFaktur').textContent=filtered.length+' faktur';
@@ -2903,7 +2908,7 @@
         document.getElementById('pumSumDibayar').textContent=fmtRp(totalDibayar);
         document.getElementById('pumSumSisa').textContent=fmtRp(totalSisa);
         document.getElementById('pumSumProfit').textContent=fmtRp(totalProfit);
-        document.getElementById('pumSumProfit').className='value '+(totalProfit<0?'orange':'');
+        document.getElementById('pumSumProfit').className='value';
         const noteEl=document.getElementById('pumSumProfitNote');
         noteEl.style.display=countProfitMissing>0?'block':'none';
         noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
@@ -3015,35 +3020,53 @@
         const items=Array.isArray(d.profitItems)?d.profitItems:[];
         let profitSectionHtml='';
         if(items.length>0){
-            const rowsHtml=items.map(it=>`<tr>
-                <td>${escapeHtml(it.produk||'-')}</td>
-                <td class="num">${it.qty||0}</td>
-                <td class="num">${it.adaHargaBeli?fmtRp(it.hargaBeli):'<span style="color:#94a3b8;">belum diisi</span>'}</td>
-                <td class="num">${it.adaHargaBeli?fmtRp(it.subtotalModal):'-'}</td>
-            </tr>`).join('');
-            const persenBayar=(d.proporsiBayar*100);
+            const proporsiBayar=d.proporsiBayar||0;
+            const rowsHtml=items.map(it=>{
+                const subtotalJual=(it.qty||0)*(it.hargaJual||0);
+                if(!it.adaHargaBeli){
+                    return `<tr>
+                        <td>${escapeHtml(it.produk||'-')}</td>
+                        <td class="num">${it.qty||0}</td>
+                        <td>${it.satuan||'-'}</td>
+                        <td class="num">${fmtRp(it.hargaJual)}</td>
+                        <td class="num"><span style="color:#94a3b8;">belum diisi</span></td>
+                        <td class="num" colspan="5" style="color:#94a3b8;">Profit belum bisa dihitung (Harga Beli kosong)</td>
+                    </tr>`;
+                }
+                const profitFull=clampProfit(subtotalJual-it.subtotalModal);
+                const pctProfitMasuk=it.subtotalModal>0?Math.max(0,(profitFull/it.subtotalModal*100)):0;
+                const bayarTitip=proporsiBayar*subtotalJual;
+                const profitTitipMasuk=clampProfit(proporsiBayar*(subtotalJual-it.subtotalModal));
+                const pctProfitTitipMasuk=it.subtotalModal>0?Math.max(0,(profitTitipMasuk/it.subtotalModal*100)):0;
+                return `<tr>
+                    <td>${escapeHtml(it.produk||'-')}</td>
+                    <td class="num">${it.qty||0}</td>
+                    <td>${it.satuan||'-'}</td>
+                    <td class="num">${fmtRp(it.hargaJual)}</td>
+                    <td class="num">${fmtRp(it.hargaBeli)}</td>
+                    <td class="num" style="color:#15803d;font-weight:700;">${fmtRp(profitFull)}</td>
+                    <td class="num">${pctProfitMasuk.toFixed(2)}%</td>
+                    <td class="num">${fmtRp(bayarTitip)}</td>
+                    <td class="num" style="color:#15803d;font-weight:700;">${fmtRp(profitTitipMasuk)}</td>
+                    <td class="num">${pctProfitTitipMasuk.toFixed(2)}%</td>
+                </tr>`;
+            }).join('');
+            const persenBayar=(proporsiBayar*100);
             const persenBayarStr=(Math.round(persenBayar*10)/10)+'%';
             const belumLunas=d.sisaTagihan>0.5;
             profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit (Proporsional / Konsinyasi)</div>
+                <div style="font-size:9.5px;color:#64748b;margin:-4px 0 6px 0;">Proporsi terbayar faktur ini: <strong>${d.modalAda?persenBayarStr:'-'}</strong> — Profit(titip)Masuk = Profit × proporsi terbayar. Profit tidak pernah ditampilkan minus (barang belum dibayar dianggap stok tertahan, bukan kerugian).</div>
+                <div style="overflow-x:auto;">
                 <table class="pum-profit-table">
-                    <thead><tr><th>Produk</th><th class="num">Qty</th><th class="num">Harga Beli</th><th class="num">Subtotal Modal</th></tr></thead>
+                    <thead><tr><th>Produk</th><th class="num">Jumlah</th><th>Satuan</th><th class="num">Harga Jual</th><th class="num">Harga Beli</th><th class="num">Profit</th><th class="num">%Profit Masuk</th><th class="num">Bayar Titip</th><th class="num">Profit(titip)Masuk</th><th class="num">%Profit titip Masuk</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
-                <div class="pum-formula-box">
-                    <div>Total Tagihan (Harga Jual) &nbsp;=&nbsp; <strong>${fmtRp(d.tagihan)}</strong></div>
-                    <div>Total Modal (Harga Beli × Qty) &nbsp;=&nbsp; <strong>${fmtRp(d.modalTotal)}</strong></div>
-                    <div>Total Dibayar (uang diterima) &nbsp;=&nbsp; <strong>${fmtRp(d.totalBayar)}</strong></div>
-                    <div>Proporsi Terbayar &nbsp;=&nbsp; Total Dibayar ÷ Total Tagihan &nbsp;=&nbsp; <strong>${d.modalAda?persenBayarStr:'-'}</strong></div>
-                    <div>Modal Proporsional &nbsp;=&nbsp; ${d.modalAda?persenBayarStr:'-'} × Total Modal &nbsp;=&nbsp; <strong>${d.modalAda?fmtRp(d.modalProporsional):'-'}</strong></div>
-                    <hr style="margin:6px 0;border:none;border-top:1px dashed #c7d2fe;">
-                    <div>Profit Real (sudah direalisasi) &nbsp;=&nbsp; Total Dibayar − Modal Proporsional &nbsp;=&nbsp; <span style="font-weight:700;font-size:12px;${d.modalAda&&d.profit<0?'color:#b91c1c;':'color:#15803d;'}">${d.modalAda?fmtRp(d.profit):'-'}</span></div>
                 </div>
-                ${d.modalAda&&belumLunas?`<div class="pum-formula-box" style="border-color:#93c5fd;background:#eff6ff;">
+                ${belumLunas?`<div class="pum-formula-box" style="border-color:#93c5fd;background:#eff6ff;margin-top:8px;">
                     <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px;">📦 Sisa Tagihan = Barang/Stok Tertahan (Bukan Rugi)</div>
                     <div>Sisa Tagihan (belum dibayar) &nbsp;=&nbsp; <strong>${fmtRp(d.sisaTagihan)}</strong> — ini adalah nilai barang yang masih tertahan di customer, bukan piutang untung.</div>
-                    <div>Sisa Modal Tertahan &nbsp;=&nbsp; Total Modal − Modal Proporsional &nbsp;=&nbsp; <strong>${fmtRp(d.sisaModalTertahan)}</strong> — masih berupa aset/persediaan, bukan kerugian.</div>
-                    <div>Estimasi Tambahan Profit saat Lunas &nbsp;=&nbsp; Sisa Tagihan − Sisa Modal Tertahan &nbsp;=&nbsp; <strong style="${d.estimasiProfitSisa<0?'color:#b91c1c;':'color:#15803d;'}">${fmtRp(d.estimasiProfitSisa)}</strong></div>
-                    <div style="margin-top:4px;">Total Profit Faktur ini jika lunas penuh &nbsp;=&nbsp; Total Tagihan − Total Modal &nbsp;=&nbsp; <strong>${fmtRp(d.profitKotorTotal)}</strong></div>
+                    <div>Sisa Modal Tertahan &nbsp;=&nbsp; Total Modal − Modal Proporsional &nbsp;=&nbsp; <strong>${d.modalAda?fmtRp(d.sisaModalTertahan):'-'}</strong> — masih berupa aset/persediaan, bukan kerugian.</div>
+                    <div>Estimasi Tambahan Profit saat Lunas &nbsp;=&nbsp; <strong style="color:#15803d;">${d.modalAda?fmtRp(clampProfit(d.estimasiProfitSisa)):'-'}</strong></div>
                 </div>`:''}
                 ${!d.modalAda?`<div class="pum-warn-box">⚠️ Harga Beli belum lengkap di Bank Data Penjualan untuk faktur ini, sehingga Profit belum bisa dihitung secara akurat.</div>`:''}`;
         } else {
@@ -3093,7 +3116,7 @@
             totalNominal+=parseNumber(d.tagihan)||0;
             totalCash+=parseNumber(d.bayarCash)||0;
             totalTransfer+=parseNumber(d.bayarTransfer)||0;
-            if(d.profit!==''&&d.profit!=null){ totalProfit+=d.profit; } else { countProfitMissing++; }
+            if(d.profit!==''&&d.profit!=null){ totalProfit+=clampProfit(d.profit); } else { countProfitMissing++; }
         });
         document.getElementById('cddSumPeriode').textContent=cddPeriodLabel();
         document.getElementById('cddSumCountFaktur').textContent=filtered.length+' faktur';
@@ -3101,7 +3124,7 @@
         document.getElementById('cddSumCash').textContent=fmtRp(totalCash);
         document.getElementById('cddSumTransfer').textContent=fmtRp(totalTransfer);
         document.getElementById('cddSumProfit').textContent=fmtRp(totalProfit);
-        document.getElementById('cddSumProfit').className='value '+(totalProfit<0?'orange':'');
+        document.getElementById('cddSumProfit').className='value';
         const noteEl=document.getElementById('cddSumProfitNote');
         noteEl.style.display=countProfitMissing>0?'block':'none';
         noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
