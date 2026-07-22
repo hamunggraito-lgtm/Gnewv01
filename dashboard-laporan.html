@@ -131,6 +131,17 @@
         #tab9 .table-wrap tbody tr:nth-child(even) td, #tab10 .table-wrap tbody tr:nth-child(even) td { background:#f8fafc; }
         #tab9 .table-wrap tbody tr:hover td, #tab10 .table-wrap tbody tr:hover td { background:#f0f4ff; }
         #tab9 .table-wrap td.num, #tab10 .table-wrap td.num { text-align:right; }
+        .faktur-link { color:#4c51bf; font-weight:700; cursor:pointer; text-decoration:underline dotted; }
+        .faktur-link:hover { color:#764ba2; text-decoration:underline solid; }
+        #pumDetailModal .pum-section-title { font-weight:700; font-size:11px; color:#1f2937; margin:10px 0 6px 0; padding-bottom:4px; border-bottom:1px solid #e2e8f0; }
+        #pumDetailModal .pum-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; font-size:11px; }
+        #pumDetailModal .pum-grid > div { padding:2px 0; }
+        #pumDetailModal table.pum-profit-table { width:100%; border-collapse:collapse; font-size:10.5px; margin-top:4px; }
+        #pumDetailModal table.pum-profit-table th { background:#eef2ff; color:#4338ca; padding:5px 7px; text-align:left; border:1px solid #e0e4f5; }
+        #pumDetailModal table.pum-profit-table td { padding:5px 7px; border:1px solid #e8ecf4; }
+        #pumDetailModal table.pum-profit-table td.num, #pumDetailModal table.pum-profit-table th.num { text-align:right; }
+        #pumDetailModal .pum-formula-box { background:#f8fafc; border:1px dashed #c7d2fe; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:11px; line-height:1.7; }
+        #pumDetailModal .pum-warn-box { background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:10.5px; color:#92400e; }
         
         .toolbar { background:#fff; border:1px solid #d1d5db; border-radius:var(--radius); padding:6px 12px; margin-bottom:8px; box-shadow:var(--shadow); display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; min-height:40px; }
         .toolbar-left { display:flex; align-items:center; gap:4px 8px; flex-wrap:wrap; }
@@ -1088,6 +1099,12 @@
         <div class="modal-box">
             <div class="modal-head"><h2 id="ptDetailTitle">🧾 Detail Faktur</h2><button class="modal-close" id="ptDetailClose">✕</button></div>
             <div class="modal-body" id="ptDetailBody" style="font-size:11px; line-height:1.9;"></div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="pumDetailModal">
+        <div class="modal-box">
+            <div class="modal-head"><h2 id="pumDetailTitle">🧾 Detail Faktur</h2><button class="modal-close" id="pumDetailClose">✕</button></div>
+            <div class="modal-body" id="pumDetailBody" style="font-size:11px; line-height:1.7;"></div>
         </div>
     </div>
     <div class="modal-overlay" id="ptInputManualModal">
@@ -2566,21 +2583,26 @@
             salesByFakturRaw.get(key).push(r);
         });
         function agregasiBarisFaktur(rows){
-            const produkSet=new Set(); let hasFitri=false, salesName='', modalTotal=0, modalAda=false;
+            const produkSet=new Set(); let hasFitri=false, salesName='', modalTotal=0, modalAda=false; const items=[];
             rows.forEach(r => {
                 const produkNama=(r.Produk||'').trim();
                 if(produkNama) produkSet.add(produkNama);
                 if(produkNama.toLowerCase().includes('fitri')) hasFitri=true;
                 if(!salesName && (r.Sales||'').trim()) salesName=(r.Sales||'').trim();
                 const hargaBeliRaw=r['Harga Beli'];
+                const qty=parseNumber(r['Jumlah'])||0;
+                const hargaJual=parseNumber(r['Harga Jual'])||0;
                 if(hargaBeliRaw!==undefined && hargaBeliRaw!==null && hargaBeliRaw!==''){
                     const hargaBeli=parseNumber(hargaBeliRaw)||0;
-                    const qty=parseNumber(r['Jumlah'])||0;
-                    modalTotal += hargaBeli*qty;
+                    const subtotalModal=hargaBeli*qty;
+                    modalTotal += subtotalModal;
                     modalAda=true;
+                    items.push({produk:produkNama||'-',qty,hargaBeli,hargaJual,subtotalModal,adaHargaBeli:true});
+                } else {
+                    items.push({produk:produkNama||'-',qty,hargaBeli:null,hargaJual,subtotalModal:null,adaHargaBeli:false});
                 }
             });
-            return {produkSet,hasFitri,salesName,modalTotal,modalAda};
+            return {produkSet,hasFitri,salesName,modalTotal,modalAda,items};
         }
         function cariSalesMatch(noFaktur, tglAcuan){
             const key=normFaktur(noFaktur);
@@ -2621,7 +2643,8 @@
                     const modalTotal=salesMatch?salesMatch.modalTotal:0;
                     const modalAda=salesMatch?salesMatch.modalAda:false;
                     const profit=modalAda?(totalBayar-modalTotal):'';
-                    piutangUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,jatuhTempo:d.jt||'-',totalBayar,sisaTagihan,statusClass,overdueDays,tglBayar,profit,_bulan:bulan,_tanggalHari:day.tanggal});
+                    const profitItems=salesMatch?salesMatch.items:[];
+                    piutangUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,jatuhTempo:d.jt||'-',totalBayar,sisaTagihan,statusClass,overdueDays,tglBayar,profit,modalTotal,modalAda,profitItems,_bulan:bulan,_tanggalHari:day.tanggal,_id:piutangUangMasukData.length});
                 });
                 (day.cashDroppingDetail||[]).forEach(d => {
                     const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal);
@@ -2696,7 +2719,7 @@
             const statusBadge=d.statusClass==='lunas'?'<span class="stempel-lunas">Lunas</span>':`<span class="badge pt-${d.statusClass}">${d.statusClass==='overdue'&&d.overdueDays!=null?`${d.overdueDays} hr/Overdue`:'Belum Lunas'}</span>`;
             const profitCell=d.profit===''?'<span style="color:#94a3b8;">-</span>':`<span style="${d.profit<0?'color:#b91c1c;font-weight:700;':'color:#15803d;font-weight:700;'}">${fmtRp(d.profit)}</span>`;
             return `<tr class="${d.statusClass==='overdue'?'pt-row-overdue':''}">
-                <td>${d.noFaktur||'-'}</td>
+                <td><span class="faktur-link" onclick="openPumDetail(${d._id})" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td>
                 <td>${d.tglFaktur||'-'}</td>
                 <td>${d.namaToko||'-'}</td>
                 <td>${d.alamat||'-'}</td>
@@ -2720,6 +2743,64 @@
         document.getElementById('piutangUangMasukInfo').textContent=filtered.length+' data';
         document.getElementById('badgePiutangUangMasuk').textContent=filtered.length;
     }
+
+    function openPumDetail(id) {
+        const d=piutangUangMasukData.find(row=>row._id===id);
+        if(!d){ showToast('⚠️ Data faktur tidak ditemukan.','warning'); return; }
+        document.getElementById('pumDetailTitle').textContent=`🧾 Detail Faktur - ${d.noFaktur||'-'}`;
+        const statusBadge=d.statusClass==='lunas'?'<span class="stempel-lunas">Lunas</span>':`<span class="badge pt-${d.statusClass}">${d.statusClass==='overdue'&&d.overdueDays!=null?`${d.overdueDays} hr/Overdue`:'Belum Lunas'}</span>`;
+        const items=Array.isArray(d.profitItems)?d.profitItems:[];
+        let profitSectionHtml='';
+        if(items.length>0){
+            const rowsHtml=items.map(it=>`<tr>
+                <td>${escapeHtml(it.produk||'-')}</td>
+                <td class="num">${it.qty||0}</td>
+                <td class="num">${it.adaHargaBeli?fmtRp(it.hargaBeli):'<span style="color:#94a3b8;">belum diisi</span>'}</td>
+                <td class="num">${it.adaHargaBeli?fmtRp(it.subtotalModal):'-'}</td>
+            </tr>`).join('');
+            profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
+                <table class="pum-profit-table">
+                    <thead><tr><th>Produk</th><th class="num">Qty</th><th class="num">Harga Beli</th><th class="num">Subtotal Modal</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                <div class="pum-formula-box">
+                    <div>Total Modal (Harga Beli × Qty) &nbsp;=&nbsp; <strong>${fmtRp(d.modalTotal)}</strong></div>
+                    <div>Total Dibayar (uang diterima) &nbsp;=&nbsp; <strong>${fmtRp(d.totalBayar)}</strong></div>
+                    <hr style="margin:6px 0;border:none;border-top:1px dashed #c7d2fe;">
+                    <div>Profit &nbsp;=&nbsp; Total Dibayar − Total Modal &nbsp;=&nbsp; <span style="font-weight:700;font-size:12px;${d.modalAda&&d.profit<0?'color:#b91c1c;':'color:#15803d;'}">${d.modalAda?fmtRp(d.profit):'-'}</span></div>
+                </div>
+                ${!d.modalAda?`<div class="pum-warn-box">⚠️ Harga Beli belum lengkap di Bank Data Penjualan untuk faktur ini, sehingga Profit belum bisa dihitung secara akurat.</div>`:''}`;
+        } else {
+            profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
+                <div class="pum-warn-box">⚠️ Tidak ditemukan data produk/Harga Beli yang cocok di Bank Data Penjualan untuk faktur ini (kemungkinan No. Faktur belum tercatat di sana), sehingga Profit belum bisa dihitung.</div>`;
+        }
+        document.getElementById('pumDetailBody').innerHTML = `
+            <div class="pum-section-title">📋 Informasi Faktur</div>
+            <div class="pum-grid">
+                <div><strong>No. Faktur:</strong> ${d.noFaktur||'-'}</div>
+                <div><strong>Tgl Transaksi:</strong> ${d.tglFaktur||'-'}</div>
+                <div><strong>Customer:</strong> ${d.namaToko||'-'}</div>
+                <div><strong>Sales:</strong> ${d.sales||'-'}</div>
+                <div><strong>Alamat:</strong> ${d.alamat||'-'}</div>
+                <div><strong>Kategori:</strong> ${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</div>
+                <div style="grid-column:1/-1;"><strong>Produk:</strong> ${d.produk||'-'}</div>
+                <div><strong>Jatuh Tempo:</strong> ${d.jatuhTempo||'-'}${d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''}</div>
+                <div><strong>Status:</strong> ${statusBadge}</div>
+                <div><strong>Tgl Bayar:</strong> ${d.tglBayar||'-'}</div>
+                <div><strong>Keterangan:</strong> ${d.ket||'-'}</div>
+            </div>
+            <div class="pum-section-title">💵 Ringkasan Tagihan</div>
+            <div class="pum-grid">
+                <div><strong>Total Tagihan:</strong> ${fmtRp(d.tagihan)}</div>
+                <div><strong>Total Dibayar:</strong> ${fmtRp(d.totalBayar)}</div>
+                <div><strong>Sisa Tagihan:</strong> <span style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${fmtRp(d.sisaTagihan)}</span></div>
+            </div>
+            ${profitSectionHtml}
+        `;
+        document.getElementById('pumDetailModal').classList.add('show');
+    }
+    document.getElementById('pumDetailClose').addEventListener('click', ()=>{ document.getElementById('pumDetailModal').classList.remove('show'); });
+    document.getElementById('pumDetailModal').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('show'); });
 
     function renderCashDroppingUangMasuk() {
         const filtered=getFilteredCashDroppingUangMasuk();
