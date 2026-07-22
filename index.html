@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GAMAS 2026 · Futuristik Hub</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#070a14" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── reset & base ── */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #070a14;
+      color: #eef2fb;
+      scroll-behavior: smooth;
+    }
+
+    /* ── deep space background ── */
+    .bg-universe {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: radial-gradient(circle at 20% 30%, rgba(20, 60, 180, 0.15) 0%, transparent 55%),
+                  radial-gradient(circle at 80% 70%, rgba(100, 40, 200, 0.10) 0%, transparent 50%),
+                  radial-gradient(circle at 40% 80%, rgba(0, 200, 255, 0.05) 0%, transparent 40%),
+                  #070a14;
+    }
+
+    /* grid lines / futuristic noise */
+    .bg-universe::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      opacity: 0.2;
+    }
+
+    /* glowing orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.25;
+      animation: floatOrb 18s ease-in-out infinite alternate;
+    }
+    .orb-1 {
+      width: 600px;
+      height: 600px;
+      top: -250px;
+      right: -150px;
+      background: radial-gradient(circle, rgba(0, 180, 255, 0.25), transparent 70%);
+      animation-duration: 26s;
+    }
+    .orb-2 {
+      width: 500px;
+      height: 500px;
+      bottom: -200px;
+      left: -120px;
+      background: radial-gradient(circle, rgba(120, 40, 220, 0.20), transparent 70%);
+      animation-duration: 32s;
+      animation-delay: -6s;
+    }
+    .orb-3 {
+      width: 300px;
+      height: 300px;
+      top: 30%;
+      left: 60%;
+      background: radial-gradient(circle, rgba(255, 215, 0, 0.10), transparent 70%);
+      animation-duration: 22s;
+      animation-delay: -12s;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(40px, -60px) scale(1.08); }
+      100% { transform: translate(-20px, 30px) scale(0.92); }
+    }
+
+    /* ── scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0b0f1a; }
+    ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 12px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4a6a9c; }
+
+    /* ── header ── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 20px;
+      padding: 12px 32px;
+      background: rgba(7, 10, 20, 0.65);
+      backdrop-filter: blur(18px) saturate(1.6);
+      -webkit-backdrop-filter: blur(18px) saturate(1.6);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 4px 30px rgba(0,0,0,0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* ── icon di pojok kiri atas dihapus ── */
+    .brand-icon {
+      display: none;
+    }
+
+    .brand h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #f0f4ff, #b7c9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 40px rgba(59, 130, 246, 0.1);
+    }
+
+    .brand .sub {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.25);
+      -webkit-text-fill-color: rgba(255, 255, 255, 0.25);
+      margin-left: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 14px 4px 6px;
+      border-radius: 40px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(4px);
+    }
+
+    .user-badge .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #3b82f6, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    #btnLogoutHeader {
+      background: transparent;
+      color: rgba(255, 255, 255, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 40px;
+      padding: 6px 18px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      font-family: inherit;
+      letter-spacing: 0.2px;
+    }
+
+    #btnLogoutHeader:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.05);
+    }
+
+    /* ── main hub ── */
+    .hub-wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 28px 40px;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 65vh;
+    }
+
+    /* greeting / headline */
+    .hub-headline {
+      margin-bottom: 48px;
+      text-align: center;
+    }
+
+    .hub-headline h2 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #eef2fb, #b7c9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hub-headline p {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 6px;
+      font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── card grid futuristik ── */
+    .kartu-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    .kartu {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 32px 20px 28px;
+      border-radius: 28px;
+      text-decoration: none;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    /* glass glow border */
+    .kartu::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 28px;
+      padding: 1px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+
+    .kartu::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 28px;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.03), transparent 65%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+
+    .kartu:hover::after {
+      opacity: 1;
+    }
+
+    /* ── perbesar kartu saat hover ── */
+    .kartu:hover {
+      transform: translateY(-8px) scale(1.04);
+      border-color: rgba(255, 255, 255, 0.06);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 80px rgba(43, 108, 240, 0.04);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .kartu .ikon-wrap {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 18px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.04);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+      transition: all 0.35s ease;
+      flex-shrink: 0;
+      backdrop-filter: blur(4px);
+    }
+
+    .kartu:hover .ikon-wrap {
+      transform: scale(1.02) translateY(-3px);
+      border-color: rgba(255,255,255,0.08);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .kartu .judul-kartu {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f4ff;
+      letter-spacing: -0.2px;
+      margin-bottom: 6px;
+    }
+
+    /* ── deskripsi kecil dibuat lebih terang dan terbaca ── */
+    .kartu .desc-kartu {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      line-height: 1.6;
+      margin-top: 2px;
+      flex: 1;
+      font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+
+    .kartu .buka-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      border: none;
+      border-radius: 60px;
+      padding: 10px 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.04);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+      align-self: center;
+      font-family: inherit;
+      letter-spacing: 0.3px;
+      backdrop-filter: blur(4px);
+    }
+
+    .kartu:hover .buka-btn {
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      border-color: rgba(255,255,255,0.08);
+      box-shadow: 0 4px 20px rgba(43, 108, 240, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .kartu .buka-btn .arrow {
+      transition: transform 0.3s ease;
+      display: inline-block;
+    }
+
+    .kartu:hover .buka-btn .arrow {
+      transform: translateX(4px);
+    }
+
+    /* status chip minimal */
+    .kartu .status-chip {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 40px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.02);
+      color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* card accent colors (subtle) */
+    .kartu.kerja .status-chip { color: rgba(59, 130, 246, 0.3); border-color: rgba(59, 130, 246, 0.05); }
+    .kartu.laporan .status-chip { color: rgba(139, 92, 246, 0.3); border-color: rgba(139, 92, 246, 0.05); }
+    .kartu.data .status-chip { color: rgba(0, 200, 255, 0.3); border-color: rgba(0, 200, 255, 0.05); }
+
+    .kartu.kerja .ikon-wrap { border-color: rgba(59, 130, 246, 0.1); }
+    .kartu.laporan .ikon-wrap { border-color: rgba(139, 92, 246, 0.1); }
+    .kartu.data .ikon-wrap { border-color: rgba(0, 200, 255, 0.1); }
+
+    /* ── footer ── */
+    .footer-site {
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 32px 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.02);
+      background: rgba(7, 10, 20, 0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: rgba(255, 255, 255, 0.12);
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .footer-site .left {
+      color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* ── by hamung 2026 dinaikkan kecerahannya ── */
+    .footer-site .right {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      font-weight: 400;
+    }
+
+    .footer-site strong {
+      color: rgba(255, 255, 255, 0.15);
+      font-weight: 600;
+    }
+
+    /* ── auth overlay ── */
+    #authOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(7, 10, 20, 0.92);
+      backdrop-filter: blur(30px) saturate(1.4);
+      -webkit-backdrop-filter: blur(30px) saturate(1.4);
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      padding: 20px;
+    }
+
+    #authForm {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 28px;
+      padding: 40px 36px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(10px);
+    }
+
+    #authForm h2 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, #f0f4ff, #b7c9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #authForm .sub-auth {
+      margin: 0 0 28px;
+      color: rgba(255, 255, 255, 0.25);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    #authForm label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: rgba(255, 255, 255, 0.25);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    #authForm input {
+      width: 100%;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 16px;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      color: #fff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      font-family: inherit;
+      outline: none;
+    }
+
+    #authForm input:focus {
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.02);
+    }
+
+    #authForm input::placeholder {
+      color: rgba(255, 255, 255, 0.08);
+    }
+
+    #authSubmitBtn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(145deg, #2b6cf0, #8b5cf6);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      box-shadow: 0 4px 24px rgba(43, 108, 240, 0.15);
+    }
+
+    #authSubmitBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 40px rgba(43, 108, 240, 0.25);
+    }
+
+    #authMsg {
+      margin-top: 16px;
+      font-size: 13px;
+      min-height: 18px;
+      color: #f8a5a5;
+      text-align: center;
+    }
+
+    /* ── responsive ── */
+    @media (max-width: 700px) {
+      .app-header { padding: 10px 16px; }
+      .brand h1 { font-size: 18px; }
+      .brand .sub { font-size: 8px; }
+      .user-badge { display: none; }
+      .hub-wrap { padding: 30px 16px 20px; min-height: 50vh; }
+      .hub-headline h2 { font-size: 22px; }
+      .kartu-grid { grid-template-columns: 1fr; gap: 18px; }
+      .kartu { padding: 24px 16px 22px; }
+      .kartu .ikon-wrap { width: 56px; height: 56px; font-size: 26px; }
+      #authForm { padding: 28px 20px 24px; }
+      .orb-1, .orb-2, .orb-3 { display: none; }
+      .footer-site {
+        flex-direction: column;
+        text-align: center;
+        padding: 16px;
+      }
+    }
+
+    @media (min-width: 701px) and (max-width: 1000px) {
+      .kartu-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- background -->
+  <div class="bg-universe"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- ─── HEADER ─── -->
+  <header class="app-header">
+    <div class="brand">
+      <!-- ikon di pojok kiri atas telah dihapus -->
+      <div>
+        <h1>GAMAS 2026</h1>
+        <span class="sub">Futuristik · Neural Hub</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="user-badge">
+        <span class="avatar">✦</span>
+        <span>Admin</span>
+      </span>
+      <button id="btnLogoutHeader" type="button">Keluar</button>
+    </div>
+  </header>
+
+  <!-- ─── MAIN ─── -->
+  <div class="hub-wrap">
+    <div class="hub-headline">
+      <h2>⚡ command center</h2>
+      <p>kelola ekosistem kerja dengan presisi tinggi</p>
+    </div>
+
+    <div class="kartu-grid">
+      <!-- KERJA -->
+      <a class="kartu kerja" href="dashboard-kerja.html">
+        <span class="status-chip">● online</span>
+        <span class="ikon-wrap">🧠</span>
+        <div class="judul-kartu">Dashboard Kerja</div>
+        <div class="desc-kartu">orkestrasi tugas &amp; alur kerja</div>
+        <span class="buka-btn">
+          akses <span class="arrow">→</span>
+        </span>
+      </a>
+
+      <!-- LAPORAN -->
+      <a class="kartu laporan" href="dashboard-laporan.html">
+        <span class="status-chip">● online</span>
+        <span class="ikon-wrap">📊</span>
+        <div class="judul-kartu">Dashboard Laporan</div>
+        <div class="desc-kartu">analitik realtime &amp; insight</div>
+        <span class="buka-btn">
+          akses <span class="arrow">→</span>
+        </span>
+      </a>
+
+      <!-- DATA -->
+      <a class="kartu data" href="dashboard-data.html">
+        <span class="status-chip">● online</span>
+        <span class="ikon-wrap">🗂️</span>
+        <div class="judul-kartu">Dashboard Data</div>
+        <div class="desc-kartu">kelola dataset &amp; intelijen</div>
+        <span class="buka-btn">
+          akses <span class="arrow">→</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ─── FOOTER ─── -->
+  <footer class="footer-site">
+    <span class="left">GAMAS 2026</span>
+    <span class="right">by hamung 2026</span>
+  </footer>
+
+  <!-- ─── AUTH OVERLAY ─── -->
+  <div id="authOverlay">
+    <form id="authForm" onsubmit="handleAuthSubmit(event)">
+      <input type="hidden" id="authMode" value="login" />
+      <h2>🔐 akses terbatas</h2>
+      <p class="sub-auth">verifikasi identitas untuk masuk ke command center</p>
+
+      <label for="authUsername">username</label>
+      <input id="authUsername" type="text" autocomplete="username" required placeholder="masukkan username" />
+
+      <label for="authPassword">password</label>
+      <input id="authPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••" />
+
+      <button id="authSubmitBtn" type="submit">Masuk</button>
+      <div id="authMsg"></div>
+    </form>
+  </div>
+
+  <!-- ─── SCRIPTS ─── -->
+  <script>
+    // ── show / hide auth overlay ──
+    function showLoginOverlay(message) {
+      const el = document.getElementById('authOverlay');
+      if (el) {
+        el.style.display = 'flex';
+        if (message) document.getElementById('authMsg').textContent = message;
+      }
+    }
+
+    function showHub() {
+      document.getElementById('authOverlay').style.display = 'none';
+    }
+
+    // ── auto-show hub (auth dinonaktifkan untuk preview) ──
+    (async function bootstrap() {
+      showHub();
+      return;
+    })();
+
+    // ── logout ──
+    document.getElementById('btnLogoutHeader').addEventListener('click', async function() {
+      if (!confirm('Yakin mau logout dari GAMAS 2026?')) return;
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      } catch (e) { /* lanjut reload */ }
+      location.reload();
+    });
+
+    // ── auth submit ──
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const mode = document.getElementById('authMode').value;
+      const username = document.getElementById('authUsername').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const msgEl = document.getElementById('authMsg');
+      msgEl.style.color = '#f8a5a5';
+      msgEl.textContent = '';
+
+      if (!username || !password) {
+        msgEl.textContent = 'Isi username dan password.';
+        return;
+      }
+
+      try {
+        const url = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
+        const opts = {
+          credentials: 'same-origin',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        };
+        const res = await fetch(url, opts);
+        if (!res.ok) {
+          let msg = 'Server error (' + res.status + ')';
+          try { const j = await res.json(); if (j.error) msg = j.error; } catch (_) {}
+          throw new Error(msg);
+        }
+        showHub();
+      } catch (err) {
+        msgEl.textContent = '❌ ' + err.message;
+      }
+    }
+
+    // ── service worker — dengan deteksi update otomatis ──
+    // Supaya kalau ada versi baru service-worker.js/HTML di server,
+    // browser langsung pakai versi itu (reload sekali), bukan nyangkut
+    // di cache lama selamanya.
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
+          .then(function(reg) {
+            document.addEventListener('visibilitychange', function() {
+              if (document.visibilityState === 'visible') reg.update().catch(function() {});
+            });
+            reg.addEventListener('updatefound', function() {
+              const baru = reg.installing;
+              if (!baru) return;
+              baru.addEventListener('statechange', function() {
+                if (baru.state === 'installed' && navigator.serviceWorker.controller) {
+                  baru.postMessage('SKIP_WAITING');
+                }
+              });
+            });
+          })
+          .catch(function(err) {
+            console.warn('Service worker gagal didaftarkan:', err);
+          });
+
+        let sudahReload = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          if (sudahReload) return;
+          sudahReload = true;
+          location.reload();
+        });
+      });
+    }
+
+    // ── mouse tracking untuk efek glow ──
+    document.querySelectorAll('.kartu').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        card.style.setProperty('--mx', x + '%');
+        card.style.setProperty('--my', y + '%');
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.setProperty('--mx', '50%');
+        card.style.setProperty('--my', '50%');
+      });
+    });
+  </script>
+
+</body>
+</html>
