@@ -2845,8 +2845,11 @@
     function pumProfitCellHtml(d) {
         if(d.profit==='' || d.profit==null) return '<span style="color:#94a3b8;">-</span>';
         const color=d.profit<0?'#b91c1c':'#15803d';
-        const basisPct=(d.tagihan>0 && d.profitKotorTotal!=='' && d.profitKotorTotal!=null)?(d.profitKotorTotal/d.tagihan*100):null;
-        const pctHtml=basisPct!=null?` <span style="font-weight:400;font-size:0.9em;color:${color};">(${basisPct>=0?'':''}${basisPct.toFixed(1)}%)</span>`:'';
+        // Persentase dihitung sama seperti di tab Bank Data Penjualan: Profit ÷ Modal (Harga Beli) × 100%.
+        // Ini persentase MARKUP faktur tersebut (tetap sama walau baru dibayar sebagian/titip);
+        // yang berubah proporsional kalau baru bayar sebagian adalah nominal Rupiah-nya saja.
+        const basisPct=(d.modalTotal>0 && d.profitKotorTotal!=='' && d.profitKotorTotal!=null)?(d.profitKotorTotal/d.modalTotal*100):null;
+        const pctHtml=basisPct!=null?` <span style="font-weight:400;font-size:0.9em;color:${color};">(${basisPct.toFixed(1)}%)</span>`:'';
         return `<span style="color:${color};font-weight:700;">${fmtRp(d.profit)}</span>${pctHtml}`;
     }
     function pumPeriodLabel() {
