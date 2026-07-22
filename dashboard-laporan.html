@@ -1023,7 +1023,7 @@
                 <div class="value" id="pumSumSisa">Rp 0</div>
             </div>
             <div class="card" style="min-width:150px;">
-                <div class="label">💰 Total Profit</div>
+                <div class="label">💰 Total Profit Real</div>
                 <div class="value" id="pumSumProfit">Rp 0</div>
                 <div id="pumSumProfitNote" style="display:none; font-size:8px; color:rgba(255,255,255,0.85); font-weight:600;"></div>
             </div>
@@ -2678,12 +2678,20 @@
                     if(statusClass!=='lunas' && d.jt){ const jtDate=ptParseDMY(d.jt); if(jtDate && jtDate<todayPtUM){ statusClass='overdue'; overdueDays=ptDaysBetween(todayPtUM,jtDate); } }
                     let tglBayar='';
                     if(statusClass==='lunas' && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayar=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
-                    // Profit = uang diterima (Total Dibayar) - (Harga Beli x Qty) dari produk di faktur terkait
+                    // Profit dihitung PROPORSIONAL sesuai porsi yang sudah dibayar (model konsinyasi/titip):
+                    // - Barang yang belum dibayar dianggap masih brg/stok di toko (bukan kerugian).
+                    // - Modal yang "dikorbankan" hanya untuk porsi yang sudah terbayar.
+                    // Profit Real = Total Dibayar - (Proporsi Dibayar x Total Modal)
                     const modalTotal=salesMatch?salesMatch.modalTotal:0;
                     const modalAda=salesMatch?salesMatch.modalAda:false;
-                    const profit=modalAda?(totalBayar-modalTotal):'';
+                    const proporsiBayar=tagihan>0?Math.max(0,Math.min(1,totalBayar/tagihan)):(totalBayar>0?1:0);
+                    const modalProporsional=modalAda?(proporsiBayar*modalTotal):0;
+                    const profit=modalAda?(totalBayar-modalProporsional):'';
+                    const profitKotorTotal=modalAda?(tagihan-modalTotal):'';
+                    const sisaModalTertahan=modalAda?(modalTotal-modalProporsional):'';
+                    const estimasiProfitSisa=modalAda?((sisaTagihan)-sisaModalTertahan):'';
                     const profitItems=salesMatch?salesMatch.items:[];
-                    piutangUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,jatuhTempo:d.jt||'-',totalBayar,sisaTagihan,statusClass,overdueDays,tglBayar,profit,modalTotal,modalAda,profitItems,_bulan:bulan,_tanggalHari:day.tanggal,_id:piutangUangMasukData.length});
+                    piutangUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,jatuhTempo:d.jt||'-',totalBayar,sisaTagihan,statusClass,overdueDays,tglBayar,profit,modalTotal,modalAda,proporsiBayar,modalProporsional,profitKotorTotal,sisaModalTertahan,estimasiProfitSisa,profitItems,_bulan:bulan,_tanggalHari:day.tanggal,_id:piutangUangMasukData.length});
                 });
                 (day.cashDroppingDetail||[]).forEach(d => {
                     const salesMatch=cariSalesMatch(d.noFaktur, d.tglFaktur||day.tanggal);
@@ -2863,17 +2871,30 @@
                 <td class="num">${it.adaHargaBeli?fmtRp(it.hargaBeli):'<span style="color:#94a3b8;">belum diisi</span>'}</td>
                 <td class="num">${it.adaHargaBeli?fmtRp(it.subtotalModal):'-'}</td>
             </tr>`).join('');
-            profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
+            const persenBayar=(d.proporsiBayar*100);
+            const persenBayarStr=(Math.round(persenBayar*10)/10)+'%';
+            const belumLunas=d.sisaTagihan>0.5;
+            profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit (Proporsional / Konsinyasi)</div>
                 <table class="pum-profit-table">
                     <thead><tr><th>Produk</th><th class="num">Qty</th><th class="num">Harga Beli</th><th class="num">Subtotal Modal</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
                 <div class="pum-formula-box">
+                    <div>Total Tagihan (Harga Jual) &nbsp;=&nbsp; <strong>${fmtRp(d.tagihan)}</strong></div>
                     <div>Total Modal (Harga Beli × Qty) &nbsp;=&nbsp; <strong>${fmtRp(d.modalTotal)}</strong></div>
                     <div>Total Dibayar (uang diterima) &nbsp;=&nbsp; <strong>${fmtRp(d.totalBayar)}</strong></div>
+                    <div>Proporsi Terbayar &nbsp;=&nbsp; Total Dibayar ÷ Total Tagihan &nbsp;=&nbsp; <strong>${d.modalAda?persenBayarStr:'-'}</strong></div>
+                    <div>Modal Proporsional &nbsp;=&nbsp; ${d.modalAda?persenBayarStr:'-'} × Total Modal &nbsp;=&nbsp; <strong>${d.modalAda?fmtRp(d.modalProporsional):'-'}</strong></div>
                     <hr style="margin:6px 0;border:none;border-top:1px dashed #c7d2fe;">
-                    <div>Profit &nbsp;=&nbsp; Total Dibayar − Total Modal &nbsp;=&nbsp; <span style="font-weight:700;font-size:12px;${d.modalAda&&d.profit<0?'color:#b91c1c;':'color:#15803d;'}">${d.modalAda?fmtRp(d.profit):'-'}</span></div>
+                    <div>Profit Real (sudah direalisasi) &nbsp;=&nbsp; Total Dibayar − Modal Proporsional &nbsp;=&nbsp; <span style="font-weight:700;font-size:12px;${d.modalAda&&d.profit<0?'color:#b91c1c;':'color:#15803d;'}">${d.modalAda?fmtRp(d.profit):'-'}</span></div>
                 </div>
+                ${d.modalAda&&belumLunas?`<div class="pum-formula-box" style="border-color:#93c5fd;background:#eff6ff;">
+                    <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px;">📦 Sisa Tagihan = Barang/Stok Tertahan (Bukan Rugi)</div>
+                    <div>Sisa Tagihan (belum dibayar) &nbsp;=&nbsp; <strong>${fmtRp(d.sisaTagihan)}</strong> — ini adalah nilai barang yang masih tertahan di customer, bukan piutang untung.</div>
+                    <div>Sisa Modal Tertahan &nbsp;=&nbsp; Total Modal − Modal Proporsional &nbsp;=&nbsp; <strong>${fmtRp(d.sisaModalTertahan)}</strong> — masih berupa aset/persediaan, bukan kerugian.</div>
+                    <div>Estimasi Tambahan Profit saat Lunas &nbsp;=&nbsp; Sisa Tagihan − Sisa Modal Tertahan &nbsp;=&nbsp; <strong style="${d.estimasiProfitSisa<0?'color:#b91c1c;':'color:#15803d;'}">${fmtRp(d.estimasiProfitSisa)}</strong></div>
+                    <div style="margin-top:4px;">Total Profit Faktur ini jika lunas penuh &nbsp;=&nbsp; Total Tagihan − Total Modal &nbsp;=&nbsp; <strong>${fmtRp(d.profitKotorTotal)}</strong></div>
+                </div>`:''}
                 ${!d.modalAda?`<div class="pum-warn-box">⚠️ Harga Beli belum lengkap di Bank Data Penjualan untuk faktur ini, sehingga Profit belum bisa dihitung secara akurat.</div>`:''}`;
         } else {
             profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
