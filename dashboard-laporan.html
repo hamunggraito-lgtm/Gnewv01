@@ -1006,24 +1006,24 @@
                 <div class="label">Periode</div>
                 <div class="value" id="pumSumPeriode" style="font-size:12px;">Semua Periode</div>
             </div>
-            <div class="card" style="min-width:110px;">
+            <div class="card" style="min-width:110px; display:none;">
                 <div class="label">Jumlah Faktur</div>
                 <div class="value" id="pumSumCountFaktur">0 faktur</div>
             </div>
-            <div class="card" style="min-width:130px;">
-                <div class="label">Total Tagihan</div>
+            <div class="card" style="min-width:150px;">
+                <div class="label">Nilai Faktur Piutang Tempo</div>
                 <div class="value" id="pumSumTagihan">Rp 0</div>
             </div>
-            <div class="card" style="min-width:130px;">
-                <div class="label">Total Dibayar</div>
+            <div class="card" style="min-width:150px;">
+                <div class="label">Total Uang Masuk Piutang Tempo</div>
                 <div class="value" id="pumSumDibayar">Rp 0</div>
             </div>
-            <div class="card" style="min-width:130px;">
+            <div class="card" style="min-width:130px; display:none;">
                 <div class="label">Sisa Tagihan</div>
                 <div class="value" id="pumSumSisa">Rp 0</div>
             </div>
             <div class="card" style="min-width:150px;">
-                <div class="label">💰 Total Profit Real</div>
+                <div class="label">🔶 Total Profit Real</div>
                 <div class="value" id="pumSumProfit">Rp 0</div>
                 <div id="pumSumProfitNote" style="display:none; font-size:8px; color:rgba(255,255,255,0.85); font-weight:600;"></div>
             </div>
@@ -2744,6 +2744,13 @@
             });
         }
         function pumSortDate(d){
+            // Prioritaskan TGL BAYAR (tanggal uang benar-benar masuk) supaya kolom TGL BAYAR
+            // tampil berurutan/kronologis. Faktur yang belum dibayar (tidak punya tglBayar)
+            // tetap diurutkan berdasarkan tanggal transaksi/faktur sebagai fallback.
+            if(d.tglBayar){
+                const parsedBayar=ptParseDMY(d.tglBayar);
+                if(parsedBayar) return parsedBayar.getTime();
+            }
             const parsed=ptParseDMY(d.tglFaktur);
             if(parsed) return parsed.getTime();
             if(d._bulan && d._tanggalHari){
