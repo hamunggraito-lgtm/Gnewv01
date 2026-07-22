@@ -1050,6 +1050,8 @@
                         <th>SALES</th>
                         <th>KATEGORI</th>
                         <th>PRODUK</th>
+                        <th class="num">JUMLAH</th>
+                        <th>SATUAN</th>
                         <th class="num">TOTAL TAGIHAN</th>
                         <th class="num">SISA TAGIHAN</th>
                         <th>JATUH TEMPO</th>
@@ -1060,7 +1062,7 @@
                         <th>KETERANGAN</th>
                     </tr>
                 </thead>
-                <tbody id="piutangUangMasukBody"><tr><td colspan="15" class="empty-msg">📂 Tidak ada data piutang tempo dari Data Uang Masuk.</td></tr></tbody>
+                <tbody id="piutangUangMasukBody"><tr><td colspan="17" class="empty-msg">📂 Tidak ada data piutang tempo dari Data Uang Masuk.</td></tr></tbody>
             </table>
         </div>
         <div class="pt-card-list" id="piutangUangMasukCardList" style="display:none;"></div>
@@ -2663,14 +2665,15 @@
                 const hargaBeliRaw=r['Harga Beli'];
                 const qty=parseNumber(r['Jumlah'])||0;
                 const hargaJual=parseNumber(r['Harga Jual'])||0;
+                const satuanNama=(r.Satuan||'').trim();
                 if(hargaBeliRaw!==undefined && hargaBeliRaw!==null && hargaBeliRaw!==''){
                     const hargaBeli=parseNumber(hargaBeliRaw)||0;
                     const subtotalModal=hargaBeli*qty;
                     modalTotal += subtotalModal;
                     modalAda=true;
-                    items.push({produk:produkNama||'-',qty,hargaBeli,hargaJual,subtotalModal,adaHargaBeli:true});
+                    items.push({produk:produkNama||'-',qty,satuan:satuanNama,hargaBeli,hargaJual,subtotalModal,adaHargaBeli:true});
                 } else {
-                    items.push({produk:produkNama||'-',qty,hargaBeli:null,hargaJual,subtotalModal:null,adaHargaBeli:false});
+                    items.push({produk:produkNama||'-',qty,satuan:satuanNama,hargaBeli:null,hargaJual,subtotalModal:null,adaHargaBeli:false});
                 }
             });
             return {produkSet,hasFitri,salesName,modalTotal,modalAda,items};
@@ -2886,7 +2889,10 @@
     function pumRenderCardList(pageRows) {
         const cardList=document.getElementById('piutangUangMasukCardList');
         if(pageRows.length===0){ cardList.innerHTML='<div class="empty-msg">📂 Tidak ada data piutang tempo dari Data Uang Masuk.</div>'; return; }
-        cardList.innerHTML=pageRows.map(d=>`
+        cardList.innerHTML=pageRows.map(d=>{
+            const items=(Array.isArray(d.profitItems)&&d.profitItems.length>0)?d.profitItems:[{produk:d.produk||'-',qty:'',satuan:''}];
+            const produkListHtml=items.map(it=>`<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dashed #e2e8f0;"><span>${escapeHtml(it.produk||'-')}</span><span style="white-space:nowrap;color:#475569;">${it.qty!==''&&it.qty!=null?it.qty:''} ${it.satuan||''}</span></div>`).join('');
+            return `
             <div class="pt-card-item ${d.statusClass==='overdue'?'pt-card-overdue':''}" onclick="openPumDetail(${d._id})">
                 <div class="pt-card-top">
                     <span class="faktur-link">${d.noFaktur||'-'}</span>
@@ -2896,11 +2902,16 @@
                 <div class="pt-card-row"><span>Sales</span><span>${d.sales||'-'}</span></div>
                 <div class="pt-card-row"><span>Tgl Transaksi</span><span>${d.tglFaktur||'-'}</span></div>
                 <div class="pt-card-row"><span>Jatuh Tempo</span><span>${d.jatuhTempo||'-'}${d.overdueDays!=null?` (${d.overdueDays} hr)`:''}</span></div>
+                <div style="margin:6px 0;padding:6px 8px;background:#f8fafc;border-radius:6px;">
+                    <div style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:2px;">PRODUK</div>
+                    ${produkListHtml}
+                </div>
                 <div class="pt-card-row"><span>Total Tagihan</span><span>${fmtRp(d.tagihan)}</span></div>
                 <div class="pt-card-row"><span>Sisa Tagihan</span><span style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${fmtRp(d.sisaTagihan)}</span></div>
                 <div class="pt-card-row highlight"><span>Profit</span><span>${pumProfitCellHtml(d)}</span></div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
     document.getElementById('piutangUangMasukViewToggle').addEventListener('click', function(){
         piutangUangMasukViewMode = piutangUangMasukViewMode==='card'?'table':'card';
@@ -2919,27 +2930,38 @@
         const start=(piutangUangMasukPage-1)*UANG_MASUK_ROWS_PER_PAGE;
         const pageRows=filtered.slice(start,start+UANG_MASUK_ROWS_PER_PAGE);
         const tbody=document.getElementById('piutangUangMasukBody');
-        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="15" class="empty-msg">📂 Tidak ada data piutang tempo dari Data Uang Masuk.</td></tr>'; }
+        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="17" class="empty-msg">📂 Tidak ada data piutang tempo dari Data Uang Masuk.</td></tr>'; }
         else { tbody.innerHTML=pageRows.map((d,i)=>{
             const statusBadge=pumStatusBadgeHtml(d);
             const profitCell=pumProfitCellHtml(d);
-            return `<tr class="${d.statusClass==='overdue'?'pt-row-overdue':''}">
+            const rowClass=d.statusClass==='overdue'?'pt-row-overdue':'';
+            // Satu faktur bisa berisi beberapa produk berbeda (mis. Botol 800ML & 400ML dalam 1 faktur).
+            // Supaya PRODUK terlihat jelas per baris (seperti tabel Bank Data Penjualan), faktur yang sama
+            // ditulis berulang untuk tiap produk, masing-masing dengan Jumlah & Satuan-nya sendiri.
+            const items=(Array.isArray(d.profitItems)&&d.profitItems.length>0)?d.profitItems:[{produk:d.produk||'-',qty:'',satuan:''}];
+            return items.map((it,idxItem)=>{
+                const isFirst=idxItem===0;
+                const groupBorder=isFirst&&i>0?'border-top:2px solid #cbd5e1;':'';
+                return `<tr class="${rowClass}" style="${groupBorder}">
                 <td><span class="faktur-link" onclick="openPumDetail(${d._id})" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td>
                 <td>${d.tglFaktur||'-'}</td>
                 <td>${d.namaToko||'-'}</td>
                 <td>${d.alamat||'-'}</td>
                 <td>${d.sales||'-'}</td>
                 <td><span class="badge pt-tercatat">${d.kategori==='fitri'?'MINYAK FITRI':'RUPA RUPA'}</span></td>
-                <td>${d.produk||'-'}</td>
-                <td class="num">${fmtRp(d.tagihan)}</td>
-                <td class="num" style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${fmtRp(d.sisaTagihan)}</td>
-                <td>${d.jatuhTempo||'-'}${d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''}</td>
-                <td>${statusBadge}</td>
-                <td>${d.tglBayar||'-'}</td>
-                <td class="num">${fmtRp(d.totalBayar)}</td>
-                <td class="num">${profitCell}</td>
-                <td>${d.ket||'-'}</td>
+                <td style="font-weight:600;">${escapeHtml(it.produk||'-')}</td>
+                <td class="num">${it.qty!==''&&it.qty!=null?it.qty:'-'}</td>
+                <td>${it.satuan||'-'}</td>
+                <td class="num">${isFirst?fmtRp(d.tagihan):''}</td>
+                <td class="num" style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${isFirst?fmtRp(d.sisaTagihan):''}</td>
+                <td>${isFirst?(d.jatuhTempo||'-')+(d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''):''}</td>
+                <td>${isFirst?statusBadge:''}</td>
+                <td>${isFirst?(d.tglBayar||'-'):''}</td>
+                <td class="num">${isFirst?fmtRp(d.totalBayar):''}</td>
+                <td class="num">${isFirst?profitCell:''}</td>
+                <td>${isFirst?(d.ket||'-'):''}</td>
             </tr>`;
+            }).join('');
         }).join(''); }
         pumRenderCardList(pageRows);
         document.getElementById('piutangUangMasukPageLabel').textContent=`Halaman ${piutangUangMasukPage} dari ${totalPages}`;
