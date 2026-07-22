@@ -17,6 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 100 100&#39;%3E%3Crect width=&#39;100&#39; height=&#39;100&#39; rx=&#39;20&#39; fill=&#39;%232d3748&#39;/%3E%3Crect x=&#39;22&#39; y=&#39;55&#39; width=&#39;14&#39; height=&#39;28&#39; rx=&#39;3&#39; fill=&#39;%23f59e0b&#39;/%3E%3Crect x=&#39;43&#39; y=&#39;38&#39; width=&#39;14&#39; height=&#39;45&#39; rx=&#39;3&#39; fill=&#39;%233b82f6&#39;/%3E%3Crect x=&#39;64&#39; y=&#39;22&#39; width=&#39;14&#39; height=&#39;61&#39; rx=&#39;3&#39; fill=&#39;%2310b981&#39;/%3E%3C/svg%3E">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
     </script>
+    <!-- Firebase (Firestore) — penyimpanan utama di server, sinkron semua perangkat -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         /* ===== CSS LENGKAP ===== */
@@ -1089,6 +1092,15 @@
         }
         .sales-card-list.show { display: flex; }
         .table-wrap.tab1-hidden { display: none; }
+        /* Kartu Cek Cash (Tab 3): tampil 2 kolom sejajar supaya lebih ringkas & mudah dibandingkan */
+        #cashCardList.show {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            align-content: start;
+        }
+        @media (max-width: 640px) {
+            #cashCardList.show { grid-template-columns: 1fr; }
+        }
         .sales-card-stempel-lunas {
             position: absolute;
             top: 8px;
@@ -1253,6 +1265,44 @@
         @media (max-width: 900px) {
             .tab1-app-toolbar { flex-direction: column; align-items: stretch; }
             .tab1-view-toggle { align-self: flex-end; }
+        }
+        /* ===== Banner deteksi anomali Bank Data Penjualan ===== */
+        .sales-anomali-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px 16px;
+            flex-wrap: wrap;
+            background: #fef9c3;
+            border: 1px solid #eab308;
+            color: #854d0e;
+            padding: 8px 14px;
+            border-radius: 8px;
+            margin: 0 0 8px 0;
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+        .sales-anomali-banner.show { display: flex; }
+        .sales-anomali-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .sales-anomali-banner-actions .btn {
+            padding: 5px 12px;
+            font-size: 11px;
+            background: #d97706;
+            border-color: #d97706;
+        }
+        .sales-anomali-banner-close {
+            background: none;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            color: #854d0e;
+            line-height: 1;
+            padding: 2px 4px;
         }
         /* ===== TAB 3 (CEK CASH) & TAB 4 (CEK PIUTANG): sticky kolom Checkbox +
            No.Faktur supaya tetap kelihatan & bisa langsung dicentang walau tabel
@@ -3952,6 +4002,13 @@
                 </div>
             </div>
         </div>
+        <div class="sales-anomali-banner" id="salesAnomaliBanner">
+            <span id="salesAnomaliBannerMsg"></span>
+            <div class="sales-anomali-banner-actions">
+                <button type="button" class="btn" id="salesAnomaliBannerBtn">🔍 Cek &amp; Bersihkan</button>
+                <button type="button" class="sales-anomali-banner-close" id="salesAnomaliBannerClose" title="Tutup">✕</button>
+            </div>
+        </div>
         <div class="tab1-split-wrap">
             <div class="tab1-split-left">
                 <div class="tab1-split-left-head">
@@ -4105,6 +4162,12 @@
 
     <!-- ======= TAB 4 – CEK PIUTANG ======= -->
     <div class="tab-content" id="tab4">
+        <div class="tab1-app-toolbar" style="justify-content:flex-end;">
+            <div class="tab1-view-toggle" id="tab4ViewToggle">
+                <button type="button" class="tab1-view-btn active" id="tab4ViewTabelBtn" data-view="table">📋 Tabel</button>
+                <button type="button" class="tab1-view-btn" id="tab4ViewKartuBtn" data-view="card">🗂️ Kartu</button>
+            </div>
+        </div>
         <div class="pt-source-status" id="ptSourceStatus">0 transaksi penjualan · 0 faktur dipilih</div>
         <div class="filter-bar">
             <div class="field" style="min-width:150px;"><label>Cari Faktur/Customer</label><input type="text" id="ptSearch" placeholder="No faktur / nama toko..."></div>
@@ -4129,7 +4192,7 @@
                 </div>
             </div>
         </div>
-        <div class="table-wrap" style="height: 485px; max-height: 485px;">
+        <div class="table-wrap" style="height: 485px; max-height: 485px;" id="tab4TableWrap">
             <table>
                 <thead>
                     <tr>
@@ -4154,6 +4217,7 @@
                 <tbody id="ptTbody"><tr><td colspan="16" class="empty-msg">📂 Belum ada data piutang tempo.</td></tr></tbody>
             </table>
         </div>
+        <div class="sales-card-list" id="ptCardList" style="height:485px;"></div>
         <div class="pagination">
             <div><button id="ptPrevPage" disabled="">◀ Sebelumnya</button><span id="ptPageInfo">Halaman 1 dari 1</span><button id="ptNextPage" disabled="">Berikutnya ▶</button></div>
             <div><span class="badge-count" id="ptTotalData">0 data</span></div>
@@ -5493,25 +5557,558 @@
         }
 
         // ================================================================
-        // PENYIMPANAN LOKAL SAJA (IndexedDB via LocalTable di atas).
-        // Firebase/Firestore sudah dihapus — semua data tersimpan di
-        // perangkat ini saja, tidak sinkron ke server/perangkat lain.
+        // FIRESTORE — penyimpanan UTAMA di server, supaya data sinkron
+        // otomatis di semua perangkat (HP, laptop, dst).
+        // IndexedDB (LocalTable di atas) tetap disiapkan sebagai CADANGAN,
+        // dipakai otomatis kalau Firestore gagal dimuat/koneksi diblokir.
         // ================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyARRCFuSvo4YIiVwAE9xJN7pDcucT_Qjx4",
+            authDomain: "gajahmas2026.firebaseapp.com",
+            projectId: "gajahmas2026",
+            storageBucket: "gajahmas2026.firebasestorage.app",
+            messagingSenderId: "688940774016",
+            appId: "1:688940774016:web:e50de185ff33320bb96c65"
+        };
+
+        // --------------------------------------------------------------
+        // PEMBERSIH DATA SEBELUM DIKIRIM KE FIRESTORE
+        // Firestore MENOLAK seluruh operasi simpan kalau ada satu saja
+        // nilai `undefined` di dalamnya (walau cuma di satu field, satu
+        // baris, dari ribuan). Fungsi ini membersihkan itu secara
+        // rekursif SEBELUM data dikirim, supaya penyimpanan tidak pernah
+        // gagal diam-diam gara-gara itu:
+        //   - key dengan value undefined di dalam object -> dihapus
+        //   - elemen undefined di dalam array -> diganti null (supaya
+        //     urutan/panjang array tidak berubah)
+        //   - null, angka, string, boolean, Date -> dibiarkan apa adanya
+        // --------------------------------------------------------------
+        function bersihkanUntukFirestore(value) {
+            if (value === undefined || value === null) return null;
+            if (value instanceof Date) return value;
+            if (Array.isArray(value)) {
+                return value.map(v => (v === undefined ? null : bersihkanUntukFirestore(v)));
+            }
+            if (typeof value === 'object') {
+                const out = {};
+                Object.keys(value).forEach(k => {
+                    const v = value[k];
+                    if (v === undefined) return; // key dibuang, bukan diisi null, biar dokumen tetap ringkas
+                    out[k] = bersihkanUntukFirestore(v);
+                });
+                return out;
+            }
+            return value; // string, number, boolean
+        }
+
+        // Ubah error Firestore mentah jadi pesan yang mudah dipahami pengguna.
+        function pesanErrorFirestore(e, konteks) {
+            // Cache IndexedDB korup ("Target ID already exists") -> coba pulihkan
+            // otomatis (hapus cache + reload sekali). Dipanggil tanpa await karena
+            // pesanErrorFirestore dipakai secara sync; reload akan terjadi begitu
+            // proses async-nya selesai.
+            pulihkanDariTargetIdError(e);
+            const kode = e && e.code ? e.code : '';
+            let sebab = e && e.message ? e.message : String(e);
+            if (kode === 'permission-denied') sebab = 'Akses ditolak (cek Firestore Security Rules di Firebase Console).';
+            else if (kode === 'unavailable') sebab = 'Tidak bisa menghubungi server (cek koneksi internet).';
+            else if (kode === 'unauthenticated') sebab = 'Sesi tidak terautentikasi.';
+            else if (/Target ID already exists/i.test(sebab)) sebab = 'Cache lokal browser rusak, sedang dipulihkan otomatis (halaman akan reload)...';
+            return 'Gagal ' + konteks + ': ' + sebab;
+        }
+
+        // Auto-recovery: kalau cache IndexedDB Firestore di browser korup, semua
+        // operasi Firestore gagal terus dengan error "Target ID already exists".
+        // Fungsi ini menghapus database IndexedDB Firestore lalu reload sekali
+        // (pakai flag di sessionStorage biar tidak reload berulang-ulang/loop).
+        async function pulihkanDariTargetIdError(err) {
+            const pesan = (err && err.message) ? err.message : String(err || '');
+            if (!/Target ID already exists/i.test(pesan)) return false;
+            if (sessionStorage.getItem('gamasSudahCobaPulihkanIndexedDb') === '1') {
+                console.error('Cache Firestore masih rusak setelah dibersihkan sekali. Coba tutup semua tab dashboard ini lalu buka ulang.');
+                return false;
+            }
+            console.warn('Terdeteksi cache Firestore korup (Target ID already exists). Membersihkan IndexedDB lalu reload...');
+            try {
+                sessionStorage.setItem('gamasSudahCobaPulihkanIndexedDb', '1');
+                const daftarDb = await indexedDB.databases();
+                await Promise.all(daftarDb
+                    .filter(db => db.name && db.name.includes('firestore'))
+                    .map(db => new Promise((resolve) => {
+                        const req = indexedDB.deleteDatabase(db.name);
+                        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+                    })));
+            } catch (e) {
+                console.warn('Gagal membersihkan IndexedDB otomatis:', e);
+            }
+            location.reload();
+            return true;
+        }
+        // Reset flag proteksi-loop begitu app berhasil jalan normal.
+        window.addEventListener('load', () => {
+            setTimeout(() => sessionStorage.removeItem('gamasSudahCobaPulihkanIndexedDb'), 15000);
+        });
+
+        let fsdb = null;
+        let firestoreSiap = false;
+        try {
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                fsdb = firebase.firestore();
+                // Catatan: cache offline bawaan Firestore (enablePersistence) SENGAJA
+                // dimatikan. Fitur ini pernah menyebabkan cache IndexedDB korup dan
+                // memicu error "Target ID already exists" yang bikin sinkron gagal
+                // terus-menerus. Backup offline sekarang mengandalkan sistem
+                // "Save All Data" manual yang sudah ada di aplikasi ini.
+                firestoreSiap = true;
+            } else {
+                console.error('SDK Firebase tidak termuat (mungkin diblokir jaringan/adblock).');
+            }
+        } catch (e) {
+            console.error('Gagal inisialisasi Firebase:', e);
+            firestoreSiap = false;
+        }
+
+        class FirestoreTable {
+            constructor(name) {
+                this.name = name;
+                this.col = fsdb.collection(name);
+            }
+            async add(obj) {
+                try {
+                    const ref = await this.col.add(bersihkanUntukFirestore(obj));
+                    return ref.id;
+                } catch (e) { throw new Error(pesanErrorFirestore(e, 'menyimpan data (' + this.name + ')')); }
+            }
+            async bulkAdd(arr) {
+                if (!arr || arr.length === 0) return;
+                try {
+                    for (let i = 0; i < arr.length; i += 450) { // batas 500 op/batch Firestore
+                        const batch = fsdb.batch();
+                        arr.slice(i, i + 450).forEach(item => {
+                            batch.set(this.col.doc(), bersihkanUntukFirestore(item));
+                        });
+                        await batch.commit();
+                    }
+                } catch (e) { throw new Error(pesanErrorFirestore(e, 'menyimpan banyak data (' + this.name + ')')); }
+            }
+            async toArray() {
+                try {
+                    const snap = await this.col.get();
+                    return snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                } catch (e) { throw new Error(pesanErrorFirestore(e, 'membaca data (' + this.name + ')')); }
+            }
+            async count() {
+                try { const snap = await this.col.get(); return snap.size; }
+                catch (e) { throw new Error(pesanErrorFirestore(e, 'menghitung data (' + this.name + ')')); }
+            }
+            async clear() {
+                try {
+                    const snap = await this.col.get();
+                    const docs = snap.docs;
+                    // PENTING: Firestore membatasi maksimal 500 operasi per batch.
+                    // Kalau semua dokumen dihapus dalam SATU batch, begitu jumlah
+                    // dokumen lewat 500, batch.commit() akan GAGAL TOTAL dengan
+                    // error "Transaction too big" — dan karena batch bersifat
+                    // all-or-nothing, tidak ada yang terhapus, tapi proses SAVE
+                    // (yang memanggil clear() lalu bulkAdd()) jadi ikut gagal
+                    // setiap saat. Makanya di sini dipecah jadi beberapa batch
+                    // kecil (maks 450 per batch), sama seperti pola di bulkAdd().
+                    for (let i = 0; i < docs.length; i += 450) {
+                        const batch = fsdb.batch();
+                        docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                    }
+                } catch (e) { throw new Error(pesanErrorFirestore(e, 'mengosongkan data (' + this.name + ')')); }
+            }
+            async delete(id) {
+                try { await this.col.doc(String(id)).delete(); }
+                catch (e) { throw new Error(pesanErrorFirestore(e, 'menghapus data (' + this.name + ')')); }
+            }
+            async update(id, changes) {
+                try { await this.col.doc(String(id)).set(bersihkanUntukFirestore(changes), { merge: true }); }
+                catch (e) { throw new Error(pesanErrorFirestore(e, 'memperbarui data (' + this.name + ')')); }
+            }
+            where(field) {
+                return {
+                    equals: (value) => ({
+                        first: async () => {
+                            try {
+                                // PENTING: sebelumnya pakai .limit(1) TANPA sorting — kalau ada
+                                // dokumen duplikat untuk 'value' yang sama (bisa terjadi karena
+                                // race dengan dashboard lain yang menulis ke koleksi yang sama),
+                                // Firestore mengembalikan dokumen secara ARBITRER, bukan yang
+                                // terbaru. Sekarang ambil semua yang cocok, pilih yang timestamp
+                                // 'tanggal'-nya paling baru.
+                                const snap = await this.col.where(field, '==', value).get();
+                                if (snap.empty) return undefined;
+                                let docs = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                                if (docs.length > 1) docs.sort((a, b) => String(b.tanggal || '').localeCompare(String(a.tanggal || '')));
+                                return docs[0];
+                            } catch (e) { throw new Error(pesanErrorFirestore(e, 'mencari data (' + this.name + ')')); }
+                        }
+                    })
+                };
+            }
+            // PENTING: method ini untuk menyisipkan/mengganti SATU HARI ke dalam dokumen bulan,
+            // memakai Firestore transaction supaya baca+gabung+tulis jadi ATOMIK. Ini mencegah
+            // race condition dengan proses simpan lain (mis. dashboard-laporan.html menulis ke
+            // dokumen bulan yang sama di waktu berdekatan) — sebelumnya pola baca-lalu-tulis
+            // terpisah bisa membuat versi lama menang cuma karena timestamp-nya kebetulan lebih
+            // baru, walau datanya lebih basi (menyebabkan hari yang baru diinput hilang lagi
+            // setelah pindah dashboard/reload).
+            async mergeSingleDay(bulan, dayRecord, matchFn) {
+                try {
+                    const q = await this.col.where('bulan', '==', bulan).get();
+                    let ref;
+                    if (q.empty) {
+                        ref = this.col.doc();
+                        await ref.set(bersihkanUntukFirestore({ bulan, data: [dayRecord], tanggal: new Date().toISOString() }));
+                        return;
+                    }
+                    let docs = q.docs;
+                    if (docs.length > 1) docs = docs.slice().sort((a, b) => String((b.data().tanggal) || '').localeCompare(String((a.data().tanggal) || '')));
+                    ref = docs[0].ref;
+                    await fsdb.runTransaction(async (tx) => {
+                        const snap = await tx.get(ref); // baca ULANG di dalam transaksi = data paling mutakhir
+                        const current = snap.exists ? (snap.data().data || []) : [];
+                        const cocok = typeof matchFn === 'function' ? matchFn : (d => d.tanggal === dayRecord.tanggal);
+                        const idx = current.findIndex(cocok);
+                        if (idx >= 0) current[idx] = dayRecord; else current.push(dayRecord);
+                        tx.set(ref, bersihkanUntukFirestore({ bulan, data: current, tanggal: new Date().toISOString() }), { merge: false });
+                    });
+                } catch (e) {
+                    throw new Error(pesanErrorFirestore(e, 'menyimpan data harian (' + this.name + ')'));
+                }
+            }
+            // ------------------------------------------------------------------
+            // SIMPAN INKREMENTAL: hanya kirim baris yang baru/berubah/dihapus,
+            // bukan hapus-semua-lalu-tulis-ulang-semua seperti clear()+bulkAdd().
+            //   - currentRows      : array baris saat ini (mis. salesData)
+            //   - docIdMap         : WeakMap(rowObject -> idDokumen), diisi/dibaca
+            //                        untuk tahu baris mana yang sudah pernah tersimpan
+            //   - snapshotMap      : Map(idDokumen -> JSON string isi terakhir yang
+            //                        dikonfirmasi tersimpan di server)
+            // Kedua map di atas diperbarui langsung (mutate in place) setelah
+            // proses berhasil, supaya save berikutnya tahu apa yang sudah sinkron.
+            // ------------------------------------------------------------------
+            async syncRows(currentRows, docIdMap, snapshotMap) {
+                try {
+                    const ops = [];
+                    const stillPresentIds = new Set();
+
+                    currentRows.forEach(row => {
+                        const id = docIdMap.get(row);
+                        if (!id) {
+                            // Baris baru (belum ada id Firestore) -> perlu ditambahkan.
+                            // this.col.doc() membuat id barunya di sisi klien SEKARANG
+                            // juga (tanpa perlu tunggu commit), jadi bisa langsung kita
+                            // simpan ke docIdMap setelah batch berhasil.
+                            const ref = this.col.doc();
+                            ops.push({ type: 'add', ref, row, id: ref.id });
+                        } else {
+                            stillPresentIds.add(id);
+                            const prevJSON = snapshotMap.get(id);
+                            const curJSON = JSON.stringify(row);
+                            if (prevJSON !== curJSON) {
+                                ops.push({ type: 'update', ref: this.col.doc(id), row, id });
+                            }
+                            // Kalau isinya sama persis dengan snapshot terakhir -> SKIP,
+                            // tidak perlu kirim apa-apa ke server untuk baris ini.
+                        }
+                    });
+
+                    // Baris yang dulu ada di snapshot tapi sekarang sudah tidak ada
+                    // lagi di currentRows -> berarti dihapus dari sisi aplikasi.
+                    snapshotMap.forEach((_, id) => {
+                        if (!stillPresentIds.has(id)) {
+                            ops.push({ type: 'delete', ref: this.col.doc(id), id });
+                        }
+                    });
+
+                    // Kirim semua operasi dalam batch kecil (maks 450 op/batch,
+                    // batas Firestore adalah 500 op/batch).
+                    for (let i = 0; i < ops.length; i += 450) {
+                        const batch = fsdb.batch();
+                        ops.slice(i, i + 450).forEach(op => {
+                            if (op.type === 'add') batch.set(op.ref, bersihkanUntukFirestore(op.row));
+                            else if (op.type === 'update') batch.set(op.ref, bersihkanUntukFirestore(op.row), { merge: false });
+                            else if (op.type === 'delete') batch.delete(op.ref);
+                        });
+                        await batch.commit();
+                    }
+
+                    // Baru setelah SEMUA batch berhasil, perbarui docIdMap & snapshotMap
+                    // supaya kalau ada error di tengah, save berikutnya masih akan
+                    // mencoba ulang operasi yang belum tercatat berhasil.
+                    ops.forEach(op => {
+                        if (op.type === 'delete') {
+                            snapshotMap.delete(op.id);
+                        } else {
+                            docIdMap.set(op.row, op.id);
+                            snapshotMap.set(op.id, JSON.stringify(op.row));
+                        }
+                    });
+
+                    return { added: ops.filter(o => o.type === 'add').length,
+                        updated: ops.filter(o => o.type === 'update').length,
+                        deleted: ops.filter(o => o.type === 'delete').length };
+                } catch (e) { throw new Error(pesanErrorFirestore(e, 'menyimpan perubahan (' + this.name + ')')); }
+            }
+        }
 
         const NAMA_TABEL = ['sales', 'cashIncome', 'printHistory', 'trash', 'piutangNotes', 'cashNotes', 'cetakTagihanMap', 'inputHarian', 'pengeluaran'];
 
-        function buatDb() {
+        function buatDb(gunakanFirestore) {
             const obj = {
                 version: function() { return { stores: function() { return { upgrade: function() {} }; } }; },
                 transaction: async function(mode, table, fn) { return await fn(); }
             };
             NAMA_TABEL.forEach(nama => {
-                obj[nama] = new LocalTable(nama);
+                obj[nama] = gunakanFirestore ? new FirestoreTable(nama) : new LocalTable(nama);
             });
             return obj;
         }
 
-        const db = buatDb();
+        const db = buatDb(firestoreSiap);
+        if (!firestoreSiap) {
+            console.warn('Memakai penyimpanan LOKAL (IndexedDB) karena Firestore gagal disiapkan. Data TIDAK akan sinkron ke perangkat lain sampai ini diperbaiki.');
+        }
+
+        // --------------------------------------------------------------
+        // Indikator status koneksi ke server (Firestore), supaya jelas
+        // beda antara "berhasil terhubung untuk membaca" dan "berhasil
+        // menyimpan" — bukan cuma tulisan statis yang menyesatkan.
+        // --------------------------------------------------------------
+        const GM_LAST_SYNC_KEY = 'gmLastSyncTime';
+        const GM_SNOOZE_KEY = 'gmSyncReminderSnoozeUntil';
+        const GM_MODE_OFFLINE_KEY = 'gmModeOfflineManual';
+        const GM_REMINDER_JAM = 2; // jam. Kalau sudah lebih dari ini sejak sinkron terakhir & sedang online -> ingatkan.
+
+        // Mode kerja OFFLINE MANUAL: beda dari status internet laptop.
+        // Kalau ini aktif, APLIKASI sengaja diputus dari server (Firestore
+        // disableNetwork) walau laptop tetap online — supaya kerja tidak
+        // ada jeda/panggilan ke server sama sekali sampai user sendiri
+        // yang mengaktifkan lagi mode online.
+        let modeOfflineManual = localStorage.getItem(GM_MODE_OFFLINE_KEY) === '1';
+
+        function formatJamMenit(ts) {
+            const d = new Date(ts);
+            return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        }
+        function formatDurasi(ms) {
+            const menit = Math.floor(ms / 60000);
+            const j = Math.floor(menit / 60), m = menit % 60;
+            return (j > 0 ? j + 'j ' : '') + m + 'm';
+        }
+        function simpanWaktuSinkronTerakhir() {
+            localStorage.setItem(GM_LAST_SYNC_KEY, String(Date.now()));
+        }
+
+        function pasangIndikatorKoneksi() {
+            const wrap = document.createElement('div');
+            wrap.id = 'fsConnWrap';
+            wrap.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9999;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:96vw;';
+
+            const badge = document.createElement('div');
+            badge.id = 'fsConnBadge';
+            badge.style.cssText = 'font-size:11px;padding:4px 10px;border-radius:12px;background:#f1f3f5;color:#495057;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap;';
+            badge.textContent = '🟡 Menghubungkan ke server...';
+
+            const modeBtn = document.createElement('button');
+            modeBtn.id = 'fsModeBtn';
+            modeBtn.type = 'button';
+            modeBtn.style.cssText = 'font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid #adb5bd;background:#fff;color:#343a40;box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;white-space:nowrap;';
+            modeBtn.addEventListener('click', toggleModeOffline);
+
+            const btn = document.createElement('button');
+            btn.id = 'fsSyncBtn';
+            btn.type = 'button';
+            btn.textContent = '🔄 Sinkron Sekarang';
+            btn.style.cssText = 'font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid #adb5bd;background:#fff;color:#343a40;box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;white-space:nowrap;';
+            btn.addEventListener('click', sinkronSekarang);
+
+            wrap.appendChild(badge);
+            wrap.appendChild(modeBtn);
+            wrap.appendChild(btn);
+            document.body.appendChild(wrap);
+            perbaruiTombolModeOffline();
+            return badge;
+        }
+
+        function perbaruiTombolModeOffline() {
+            const btn = document.getElementById('fsModeBtn');
+            if (!btn) return;
+            if (modeOfflineManual) {
+                btn.textContent = '📴 Mode Kerja: OFFLINE';
+                btn.title = 'Aplikasi sengaja diputus dari server. Klik untuk online-kan lagi & sinkron.';
+                btn.style.background = '#495057'; btn.style.color = '#fff'; btn.style.borderColor = '#495057';
+            } else {
+                btn.textContent = '🌐 Mode Kerja: ONLINE';
+                btn.title = 'Klik untuk memutus aplikasi dari server (tetap kerja walau laptop online)';
+                btn.style.background = '#fff'; btn.style.color = '#343a40'; btn.style.borderColor = '#adb5bd';
+            }
+        }
+
+        // Terapkan mode jaringan Firestore sesuai preferensi tersimpan,
+        // dipanggil sekali di awal SEBELUM cek koneksi apa pun dilakukan.
+        async function terapkanModeJaringanAwal() {
+            if (!firestoreSiap) return;
+            try {
+                if (modeOfflineManual) await fsdb.disableNetwork();
+                // Kalau online, tidak perlu panggil enableNetwork() eksplisit di
+                // sini — network memang default aktif begitu Firestore baru
+                // diinisialisasi. Ini SATU-SATUNYA titik di mana kita panggil
+                // disableNetwork()/enableNetwork(), yaitu sekali di awal
+                // sebelum operasi lain berjalan.
+            } catch (e) { /* abaikan, tetap lanjut pakai cache lokal */ }
+        }
+
+        // --------------------------------------------------------------
+        // PENTING — kenapa toggleModeOffline() & sinkronSekarang() DI
+        // BAWAH INI TIDAK memanggil fsdb.enableNetwork()/disableNetwork()
+        // secara langsung (live) di tengah sesi:
+        // SDK Firestore Web punya bug lama yang belum diperbaiki Google
+        // ("Target ID already exists", lihat firebase/flutterfire#7197)
+        // yang muncul kalau disableNetwork()/enableNetwork() dipanggil
+        // berulang dalam satu sesi yang sama sementara ada query/listener
+        // lain yang sudah berjalan. Solusi amannya: cukup ganti preferensi
+        // di localStorage lalu RELOAD halaman — nyala/matinya koneksi
+        // hanya terjadi SEKALI di awal (lihat terapkanModeJaringanAwal
+        // di atas), tepat sebelum operasi lain mulai jalan, sesuai pola
+        // yang didukung resmi oleh dokumentasi Firebase.
+        // --------------------------------------------------------------
+        function toggleModeOffline() {
+            const modeBtn = document.getElementById('fsModeBtn');
+            if (modeBtn) modeBtn.disabled = true;
+            modeOfflineManual = !modeOfflineManual;
+            localStorage.setItem(GM_MODE_OFFLINE_KEY, modeOfflineManual ? '1' : '0');
+            const badge = document.getElementById('fsConnBadge');
+            if (badge) {
+                badge.textContent = modeOfflineManual ? '📴 Mengaktifkan mode offline...' : '🟡 Mengaktifkan mode online...';
+                badge.style.background = '#fff3bf'; badge.style.color = '#5c3c00';
+            }
+            setTimeout(() => location.reload(), 300);
+        }
+
+        async function cekKoneksiFirestore() {
+            const badge = document.getElementById('fsConnBadge') || pasangIndikatorKoneksi();
+            if (modeOfflineManual) {
+                badge.textContent = '📴 Mode Offline (manual) — perubahan disimpan lokal';
+                badge.style.background = '#e9ecef'; badge.style.color = '#343a40';
+                return false;
+            }
+            if (!firestoreSiap) {
+                badge.textContent = '🔴 Server tidak tersedia — data tersimpan LOKAL saja';
+                badge.style.background = '#ffe3e3'; badge.style.color = '#c92a2a';
+                return false;
+            }
+            try {
+                await fsdb.collection('sales').limit(1).get();
+                badge.textContent = '🟢 Tersambung & tersinkron ke server';
+                badge.style.background = '#d3f9d8'; badge.style.color = '#2b8a3e';
+                simpanWaktuSinkronTerakhir();
+                sembunyikanReminderSinkron();
+                return true;
+            } catch (e) {
+                badge.textContent = '🔴 Gagal tersambung ke server: ' + (e && e.code ? e.code : 'periksa koneksi');
+                badge.style.background = '#ffe3e3'; badge.style.color = '#c92a2a';
+                return false;
+            }
+        }
+
+        // --------------------------------------------------------------
+        // TOMBOL "🔄 Sinkron Sekarang" — pastikan Mode Kerja jadi ONLINE
+        // lalu MUAT ULANG halaman (bukan panggil enableNetwork() secara
+        // live), supaya semua tab tertarik data terbaru dari server dan
+        // semua perubahan offline yang tertunda benar-benar terkirim,
+        // tanpa memicu bug SDK di atas. Aman dipakai kapan saja — data
+        // yang sudah tersimpan lokal (IndexedDB Firestore) TIDAK hilang
+        // oleh reload, dan tetap akan terkirim begitu online lagi.
+        // --------------------------------------------------------------
+        let sedangSinkron = false;
+        function sinkronSekarang() {
+            if (sedangSinkron) return;
+            sedangSinkron = true;
+            const btn = document.getElementById('fsSyncBtn');
+            const badge = document.getElementById('fsConnBadge');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyinkronkan...'; }
+            if (badge) { badge.textContent = '🟡 Menyinkronkan ke server...'; badge.style.background = '#fff3bf'; badge.style.color = '#5c3c00'; }
+            if (modeOfflineManual) {
+                modeOfflineManual = false;
+                localStorage.setItem(GM_MODE_OFFLINE_KEY, '0');
+            }
+            setTimeout(() => location.reload(), 400);
+        }
+
+        // --------------------------------------------------------------
+        // PENGINGAT OTOMATIS: kalau perangkat sedang online tapi sudah
+        // lama tidak berhasil sinkron (default > 2 jam), tampilkan
+        // banner pengingat supaya tidak lupa online-kan sore hari.
+        // Tidak muncul kalau Mode Kerja memang sengaja diset OFFLINE.
+        // --------------------------------------------------------------
+        function sembunyikanReminderSinkron() {
+            const el = document.getElementById('gmSyncReminder');
+            if (el) el.remove();
+        }
+        function tampilkanReminderSinkron(lastSync) {
+            if (document.getElementById('gmSyncReminder')) return;
+            const snoozeUntil = Number(localStorage.getItem(GM_SNOOZE_KEY) || 0);
+            if (Date.now() < snoozeUntil) return;
+
+            const el = document.createElement('div');
+            el.id = 'gmSyncReminder';
+            el.style.cssText = 'position:fixed;bottom:44px;right:8px;z-index:9999;max-width:280px;background:#fff3bf;color:#5c3c00;border:1px solid #f5c518;border-radius:12px;padding:10px 12px;font-size:12px;box-shadow:0 2px 10px rgba(0,0,0,.2);';
+            const sejak = lastSync ? ('sejak ' + formatJamMenit(lastSync) + ' (' + formatDurasi(Date.now() - lastSync) + ' lalu)') : '— belum pernah sinkron sesi ini';
+            el.innerHTML = '⏰ <b>Belum sinkron</b> ' + sejak + '. Data terbaru belum tentu masuk ke server.';
+
+            const row = document.createElement('div');
+            row.style.cssText = 'margin-top:8px;display:flex;gap:6px;';
+
+            const btnSync = document.createElement('button');
+            btnSync.textContent = '🔄 Sinkron Sekarang';
+            btnSync.style.cssText = 'flex:1;font-size:11.5px;padding:5px 8px;border-radius:8px;border:1px solid #5c3c00;background:#5c3c00;color:#fff;cursor:pointer;';
+            btnSync.addEventListener('click', () => { sembunyikanReminderSinkron(); sinkronSekarang(); });
+
+            const btnNanti = document.createElement('button');
+            btnNanti.textContent = 'Nanti (30m)';
+            btnNanti.style.cssText = 'font-size:11.5px;padding:5px 8px;border-radius:8px;border:1px solid #ad8b00;background:transparent;color:#5c3c00;cursor:pointer;';
+            btnNanti.addEventListener('click', () => {
+                localStorage.setItem(GM_SNOOZE_KEY, String(Date.now() + 30 * 60000));
+                sembunyikanReminderSinkron();
+            });
+
+            row.appendChild(btnSync);
+            row.appendChild(btnNanti);
+            el.appendChild(row);
+            document.body.appendChild(el);
+        }
+        function cekPengingatSinkron() {
+            if (modeOfflineManual) { sembunyikanReminderSinkron(); return; } // sengaja offline, jangan diganggu
+            if (!navigator.onLine) return; // fokus cuma saat online tapi lupa sinkron
+            const lastSyncRaw = localStorage.getItem(GM_LAST_SYNC_KEY);
+            const lastSync = lastSyncRaw ? Number(lastSyncRaw) : null;
+            const batasMs = GM_REMINDER_JAM * 60 * 60000;
+            if (!lastSync || (Date.now() - lastSync) > batasMs) {
+                tampilkanReminderSinkron(lastSync);
+            } else {
+                sembunyikanReminderSinkron();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await terapkanModeJaringanAwal();
+            await cekKoneksiFirestore();
+        });
+        window.addEventListener('online', () => { if (!modeOfflineManual) cekKoneksiFirestore(); });
+        window.addEventListener('offline', function() {
+            if (modeOfflineManual) return; // badge sudah menunjukkan mode offline manual, jangan ditimpa
+            const badge = document.getElementById('fsConnBadge') || pasangIndikatorKoneksi();
+            badge.textContent = '🔴 Offline — data disimpan lokal, akan sinkron saat online lagi';
+            badge.style.background = '#ffe3e3'; badge.style.color = '#c92a2a';
+        });
+        setInterval(cekPengingatSinkron, 5 * 60000); // cek tiap 5 menit
+        document.addEventListener('DOMContentLoaded', () => setTimeout(cekPengingatSinkron, 3000));
 
         // ================================================================
         // STICKY FILTER BAR — filter tetap kelihatan di bawah header & tab
@@ -7321,6 +7918,7 @@
             rebuildSalesFilterOptions();
             salesCurrentDateIndex = Infinity;
             renderSales();
+            checkAndShowSalesAnomaliBanner();
             localStorage.removeItem(TRANSFER_BANKDATA_KEY);
             document.getElementById('transferBankDataBar').style.display = 'none';
             window._pendingTransferData = null;
@@ -7391,6 +7989,141 @@
             return { toDeleteIdx, toFlagIdx };
         }
 
+        // ================================================================
+        // DETEKSI ANOMALI BANK DATA PENJUALAN (banner otomatis + modal detail)
+        // Kategori yang dideteksi:
+        //  - Baris hantu (pasangan minus/plus dari edit faktur) -> siap dibersihkan otomatis
+        //  - Baris minus TANPA pasangan -> kemungkinan retur/void asli, perlu periksa manual
+        //  - Total transaksi minus (di luar 2 kategori di atas)
+        //  - Harga Jual kosong/0 padahal Jumlah > 0
+        //  - Disc lebih besar dari nilai jual (Jumlah x Harga Jual), sehingga Total janggal
+        // ================================================================
+        function detectSalesAnomali(rows) {
+            const { toDeleteIdx, toFlagIdx } = cariBarisHantuSales(rows);
+            const ghostSet = new Set([...toDeleteIdx, ...toFlagIdx]);
+            const totalMinus = [], hargaKosong = [], discBerlebih = [];
+            rows.forEach((r, idx) => {
+                if (ghostSet.has(idx)) return; // sudah tercakup kategori baris hantu / minus tanpa pasangan
+                const jumlah = parseNumber(r.Jumlah);
+                const harga = parseNumber(r['Harga Jual']);
+                const disc = parseNumber(r.Disc);
+                const totalRaw = (r.Total !== undefined && r.Total !== '') ? parseNumber(r.Total) : ((jumlah || 0) * (harga || 0) - (disc || 0));
+                if (isFinite(totalRaw) && totalRaw < 0) { totalMinus.push(idx); return; }
+                if (jumlah > 0 && (!isFinite(harga) || harga <= 0)) { hargaKosong.push(idx); return; }
+                if (isFinite(disc) && disc > 0 && isFinite(jumlah) && isFinite(harga) && disc > (jumlah * harga)) { discBerlebih.push(idx); return; }
+            });
+            return { toDeleteIdx, toFlagIdx, totalMinus, hargaKosong, discBerlebih };
+        }
+
+        function totalAnomaliCount(result) {
+            return result.toDeleteIdx.length + result.toFlagIdx.length + result.totalMinus.length +
+                result.hargaKosong.length + result.discBerlebih.length;
+        }
+
+        function formatSalesAnomaliMsg(result) {
+            const total = totalAnomaliCount(result);
+            if (!total) return '';
+            const parts = [];
+            if (result.toDeleteIdx.length) parts.push(`${result.toDeleteIdx.length} baris hantu (siap dibersihkan otomatis)`);
+            if (result.toFlagIdx.length) parts.push(`${result.toFlagIdx.length} minus tanpa pasangan`);
+            if (result.totalMinus.length) parts.push(`${result.totalMinus.length} Total transaksi minus`);
+            if (result.hargaKosong.length) parts.push(`${result.hargaKosong.length} Harga Jual kosong/0`);
+            if (result.discBerlebih.length) parts.push(`${result.discBerlebih.length} Disc lebih besar dari nilai jual`);
+            return `⚠️ Ditemukan ${total} kemungkinan anomali di Bank Data Penjualan: ${parts.join(', ')}.`;
+        }
+
+        let salesAnomaliBannerTimer = null;
+        function checkAndShowSalesAnomaliBanner() {
+            const banner = document.getElementById('salesAnomaliBanner');
+            const msgEl = document.getElementById('salesAnomaliBannerMsg');
+            if (!banner || !msgEl) return;
+            if (salesAnomaliBannerTimer) { clearTimeout(salesAnomaliBannerTimer); salesAnomaliBannerTimer = null; }
+            const result = detectSalesAnomali(salesData);
+            const msg = formatSalesAnomaliMsg(result);
+            if (!msg) { banner.classList.remove('show'); return; }
+            msgEl.textContent = msg;
+            banner.classList.add('show');
+            salesAnomaliBannerTimer = setTimeout(() => { banner.classList.remove('show'); }, 15000);
+        }
+
+        document.getElementById('salesAnomaliBannerClose').addEventListener('click', function() {
+            document.getElementById('salesAnomaliBanner').classList.remove('show');
+            if (salesAnomaliBannerTimer) { clearTimeout(salesAnomaliBannerTimer); salesAnomaliBannerTimer = null; }
+        });
+
+        document.getElementById('salesAnomaliBannerBtn').addEventListener('click', function() {
+            document.getElementById('salesAnomaliBanner').classList.remove('show');
+            if (salesAnomaliBannerTimer) { clearTimeout(salesAnomaliBannerTimer); salesAnomaliBannerTimer = null; }
+            bukaModalDeteksiAnomaliSales();
+        });
+
+        function anomaliRowHtml(idx, catLabel) {
+            const r = salesData[idx];
+            if (!r) return '';
+            const jumlah = parseNumber(r.Jumlah);
+            const harga = parseNumber(r['Harga Jual']);
+            const disc = parseNumber(r.Disc);
+            const totalRaw = (r.Total !== undefined && r.Total !== '') ? parseNumber(r.Total) : ((jumlah || 0) * (harga || 0) - (disc || 0));
+            return `<tr>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(String(r.Tanggal || ''))}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(String(r['No.Faktur'] || ''))}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(String(r.Produk || ''))}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;text-align:right;">${escapeHtml(String(r.Jumlah))}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;text-align:right;">${fmtRp(totalRaw)}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(catLabel)}</td>
+            </tr>`;
+        }
+
+        function bukaModalDeteksiAnomaliSales() {
+            if (!salesData.length) { showToast('Tidak ada data di Bank Data Penjualan.', 'warning'); return; }
+            const result = detectSalesAnomali(salesData);
+            const total = totalAnomaliCount(result);
+            if (!total) {
+                showToast('✅ Tidak ditemukan anomali di Bank Data Penjualan saat ini.', 'success');
+                document.getElementById('salesAnomaliBanner').classList.remove('show');
+                return;
+            }
+            let rowsHtml = '';
+            result.toDeleteIdx.forEach(idx => rowsHtml += anomaliRowHtml(idx, '🧹 Baris Hantu (siap dibersihkan)'));
+            result.toFlagIdx.forEach(idx => rowsHtml += anomaliRowHtml(idx, '⚠️ Minus tanpa pasangan'));
+            result.totalMinus.forEach(idx => rowsHtml += anomaliRowHtml(idx, '🔻 Total minus'));
+            result.hargaKosong.forEach(idx => rowsHtml += anomaliRowHtml(idx, '❓ Harga Jual kosong/0'));
+            result.discBerlebih.forEach(idx => rowsHtml += anomaliRowHtml(idx, '❗ Disc > nilai jual'));
+
+            document.getElementById('detailModalTitleGlobal').textContent = `🔍 Deteksi Anomali Bank Data Penjualan (${total} baris)`;
+            document.getElementById('detailModalBodyGlobal').innerHTML = `
+                <p style="margin-bottom:10px;font-size:12px;color:#555;">
+                    Ringkasan: <b>${result.toDeleteIdx.length}</b> baris hantu siap dibersihkan otomatis,
+                    <b>${result.toFlagIdx.length}</b> baris minus tanpa pasangan (perlu periksa manual),
+                    <b>${result.totalMinus.length}</b> Total transaksi minus,
+                    <b>${result.hargaKosong.length}</b> baris Harga Jual kosong/0,
+                    <b>${result.discBerlebih.length}</b> baris Disc lebih besar dari nilai jual.
+                </p>
+                <div style="max-height:360px;overflow:auto;margin-bottom:12px;">
+                <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                    <thead><tr style="background:#f1f5f9;">
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">Tanggal</th>
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">No.Faktur</th>
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">Produk</th>
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">Jumlah</th>
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">Total</th>
+                        <th style="padding:4px 8px;border:1px solid #e2e8f0;">Kategori</th>
+                    </tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                </div>
+                ${result.toDeleteIdx.length ? `<button class="btn" id="btnBersihkanDariModalAnomali" style="background:#0d6efd;border-color:#0d6efd;">🧹 Bersihkan Baris Hantu Sekarang</button>` : ''}
+            `;
+            document.getElementById('detailModalGlobal').classList.add('show');
+            const btnBersihkanModal = document.getElementById('btnBersihkanDariModalAnomali');
+            if (btnBersihkanModal) {
+                btnBersihkanModal.addEventListener('click', function() {
+                    document.getElementById('detailModalGlobal').classList.remove('show');
+                    document.getElementById('btnBersihkanHantu').click();
+                });
+            }
+        }
+
         document.getElementById('btnBersihkanHantu').addEventListener('click', async function() {
             if (!salesData.length) { showToast('Tidak ada data di Bank Data Penjualan.', 'warning'); return; }
 
@@ -7416,6 +8149,7 @@
             rebuildSalesFilterOptions();
             salesCurrentDateIndex = Infinity;
             renderSales();
+            checkAndShowSalesAnomaliBanner();
 
             if (okSave) {
                 const pesanFlag = toFlagIdx.length ? ` ⚠️ ${toFlagIdx.length} baris ditandai untuk diperiksa manual.` : '';
@@ -7528,6 +8262,7 @@
                     rebuildSalesFilterOptions();
                     salesCurrentDateIndex = Infinity;
                     renderSales();
+                    checkAndShowSalesAnomaliBanner();
                     if (okSave) {
                         const dupMsg = dupSkipped > 0 ? ` ⚠️ ${dupSkipped} baris duplikat (No.Faktur+Produk sudah ada) dilewati.` : '';
                         showToast('✅ ' + added + ' baris tersimpan permanen (aman untuk refresh).' + dupMsg, 'success');
@@ -8469,6 +9204,7 @@
             const outstanding = rows.filter(r => r.statusClass !== 'lunas').length;
             document.getElementById('badgePiutang').textContent = outstanding;
 
+            renderPiutangCards(pageRows, start);
             updatePiutangSelectedInfo();
         }
 
@@ -8505,6 +9241,81 @@
                 if (e.target.checked) sendSelectedToTab6();
             }
         });
+
+        // ===== Mode Kartu untuk Cek Piutang (Tab 4) — sama seperti Cek Cash ===== //
+        function renderPiutangCards(pageRows, start) {
+            const wrap = document.getElementById('ptCardList');
+            if (!wrap) return;
+            if (!pageRows || pageRows.length === 0) {
+                wrap.innerHTML = `<div class="sales-card-empty">📂 Belum ada data piutang tempo.</div>`;
+                return;
+            }
+            wrap.innerHTML = pageRows.map((r, i) => {
+                const realIdx = start + i;
+                const checked = ptChecked[r.noFaktur] ? 'checked' : '';
+                const sisaTagihan = ptSisaTagihanBaris(r);
+                const noFakturSafe = escapeHtml(String(r.noFaktur || ''));
+                const statusBadge = r.statusClass === 'lunas' ?
+                    '<span class="badge lunas-mini">✅ Lunas</span>' :
+                    `<span class="badge pt-${r.statusClass}">${r.statusClass === 'overdue' && r.overdueDays != null ? `${r.overdueDays} hr/Overdue` : ptStatusLabel(r.statusClass)}</span>`;
+                return `<div class="sales-card${checked ? ' selected' : ''}">
+                    ${r.statusClass === 'lunas' ? '<div class="sales-card-stempel-lunas">Lunas</div>' : ''}
+                    <div class="sales-card-top">
+                        <div class="sales-card-top-left">
+                            <input type="checkbox" class="pt-row-checkbox" data-faktur="${noFakturSafe}" ${checked}>
+                            <a href="#" class="pt-faktur-link sales-card-faktur" data-idx="${realIdx}">${piutangNotesMap[r.noFaktur] ? '📝 ' : ''}${noFakturSafe}</a>
+                        </div>
+                        <span class="sales-card-date">${fmtTanggalYY(fmtTanggal(r.tanggal))}</span>
+                    </div>
+                    <div class="sales-card-produk">${escapeHtml(r.customer || '-')}</div>
+                    <div class="sales-card-qty">${escapeHtml(r.alamat || '-')}${r.produkNama ? ' · ' + escapeHtml(r.produkNama) : ''}</div>
+                    <div class="sales-card-mid">
+                        <span class="sales-card-total">${fmtRp(r.total)}</span>
+                        <span class="sales-card-badges"><span class="badge pt-tercatat">${r.kategori === 'fitri' ? 'Minyak Fitri' : 'Rupa Rupa'}</span> ${statusBadge}</span>
+                    </div>
+                    <div class="sales-card-foot">
+                        <span><b>${escapeHtml(r.sales || '-')}</b></span>
+                        <span>Jth Tempo: ${r.jt ? fmtTanggalYY(r.jt) : '-'}</span>
+                        ${r.statusClass !== 'lunas' ? `<span>Sisa: <b>${fmtRp(sisaTagihan)}</b></span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        document.getElementById('ptCardList').addEventListener('change', function(e) {
+            if (e.target.classList.contains('pt-row-checkbox')) {
+                const faktur = e.target.dataset.faktur;
+                ptChecked[faktur] = e.target.checked;
+                e.target.closest('.sales-card').classList.toggle('selected', e.target.checked);
+                const allCbs = document.querySelectorAll('.pt-row-checkbox');
+                const checkedCbs = document.querySelectorAll('.pt-row-checkbox:checked');
+                const selectAll = document.getElementById('ptSelectAll');
+                if (selectAll) selectAll.checked = (allCbs.length > 0 && checkedCbs.length === allCbs.length);
+                updatePiutangSelectedInfo();
+                if (e.target.checked) sendSelectedToTab6();
+            }
+        });
+
+        let tab4ViewMode = localStorage.getItem('tab4ViewMode') === 'card' ? 'card' : 'table';
+        function applyTab4ViewMode() {
+            const isCard = tab4ViewMode === 'card';
+            const tableWrap = document.getElementById('tab4TableWrap');
+            const cardList = document.getElementById('ptCardList');
+            const tabelBtn = document.getElementById('tab4ViewTabelBtn');
+            const kartuBtn = document.getElementById('tab4ViewKartuBtn');
+            if (tableWrap) tableWrap.style.display = isCard ? 'none' : '';
+            if (cardList) cardList.classList.toggle('show', isCard);
+            if (tabelBtn) tabelBtn.classList.toggle('active', !isCard);
+            if (kartuBtn) kartuBtn.classList.toggle('active', isCard);
+        }
+        document.getElementById('tab4ViewToggle').addEventListener('click', function(e) {
+            const btn = e.target.closest('.tab1-view-btn');
+            if (!btn) return;
+            tab4ViewMode = btn.dataset.view === 'card' ? 'card' : 'table';
+            localStorage.setItem('tab4ViewMode', tab4ViewMode);
+            applyTab4ViewMode();
+        });
+        applyTab4ViewMode();
 
         document.getElementById('ptSelectAll').addEventListener('change', function() {
             const checked = this.checked;
@@ -10189,8 +11000,23 @@
             const dayRecord = { tanggal: tanggalKey, piutangCash, piutangTransfer, penjualanCash, penjualanTransfer,
                 totalCash, totalTransfer, grandTotal, piutangDetail, cashDroppingDetail };
 
-            // Simpan/gabung data 1 hari ke dalam dokumen bulan (penyimpanan lokal saja).
-            {
+            // PENTING: dulu di sini pola baca-lalu-tulis terpisah (baca dari server,
+            // ubah 1 hari, tulis balik SEMUA hari) — ini TIDAK atomik. Kalau ada proses
+            // simpan lain (mis. dashboard-laporan.html menulis ke dokumen bulan yang
+            // sama di waktu berdekatan) versi yang dibaca di sini bisa basi, dan
+            // tulisan balik yang basi itu malah MENANG karena timestamp-nya kebetulan
+            // lebih baru — akibatnya hari yang baru diinput di tempat lain hilang lagi
+            // setelah pindah dashboard/reload. Sekarang pakai Firestore transaction
+            // (mergeSingleDay) yang baca+gabung+tulis dalam satu operasi atomik.
+            if (firestoreSiap) {
+                try {
+                    await db.cashIncome.mergeSingleDay(bulanKey, dayRecord, d => normDDMM(d.tanggal) === normDDMM(tanggalKey));
+                    cashDataMap[bulanKey] = (await db.cashIncome.where('bulan').equals(bulanKey).first())?.data || cashDataMap[bulanKey] || [];
+                    _cashAllCacheTime = 0; // invalidate cache biar tampilan sinkron dengan server
+                } catch (e) {
+                    showToast('⚠️ Gagal sinkron data harian ke server: ' + (e && e.message ? e.message : e), 'warning');
+                }
+            } else {
                 let list;
                 try {
                     const rec = await db.cashIncome.where('bulan').equals(bulanKey).first();
@@ -12749,6 +13575,7 @@
                 await loadAllCashDataBeforePtRefresh();  // ← Load ALL months of cash data
                 renderPemasukan();
                 renderSales();
+                checkAndShowSalesAnomaliBanner();
                 renderCek();
                 await ptRefresh(false);
                 renderTagihanDariPiutang();
