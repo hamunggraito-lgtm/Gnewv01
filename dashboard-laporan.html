@@ -1033,6 +1033,7 @@
             <div class="field"><label>Tanggal</label><input type="date" id="piutangUangMasukTanggal"></div>
             <div class="field"><label>Bulan</label><select id="piutangUangMasukBulan"><option value="">Semua</option></select></div>
             <div class="field"><label>Sales</label><select id="piutangUangMasukSales"><option value="">Semua</option></select></div>
+            <div class="field"><label>Status</label><select id="piutangUangMasukStatus"><option value="">Semua</option><option value="lunas">✅ Sudah Lunas</option><option value="titip">🟠 Titip/Belum Lunas</option></select></div>
             <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn btn-reset" id="piutangUangMasukBtnReset">↺ Reset</button></div>
             <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn" id="piutangUangMasukBtnRefresh">🔄 Muat Ulang</button></div>
             <div class="field" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn btn-outline" id="piutangUangMasukViewToggle">🗂️ Mode Kartu</button></div>
@@ -1122,11 +1123,12 @@
                         <th class="num">Nominal</th>
                         <th class="num">Bayar Cash</th>
                         <th class="num">Bayar Transfer</th>
+                        <th>Tgl Bayar</th>
                         <th class="num">Profit</th>
                         <th>Keterangan</th>
                     </tr>
                 </thead>
-                <tbody id="cashDroppingUangMasukBody"><tr><td colspan="12" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr></tbody>
+                <tbody id="cashDroppingUangMasukBody"><tr><td colspan="13" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr></tbody>
             </table>
         </div>
         <div class="pt-card-list" id="cashDroppingUangMasukCardList" style="display:none;"></div>
@@ -2738,19 +2740,14 @@
                     const profitKotorTotalCdd=modalAdaCdd?(tagihanCdd-modalTotalCdd):'';
                     const sisaModalTertahanCdd=modalAdaCdd?(modalTotalCdd-modalProporsionalCdd):'';
                     const sisaTagihanCdd=Math.max(0,tagihanCdd-totalBayarCdd);
+                    let tglBayarCdd='';
+                    if(sisaTagihanCdd<=0.5 && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayarCdd=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
                     const estimasiProfitSisaCdd=modalAdaCdd?(sisaTagihanCdd-sisaModalTertahanCdd):'';
-                    cashDroppingUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,tagihan:tagihanCdd,totalBayar:totalBayarCdd,sisaTagihan:sisaTagihanCdd,modalTotal:modalTotalCdd,modalAda:modalAdaCdd,proporsiBayar:proporsiBayarCdd,modalProporsional:modalProporsionalCdd,profit:profitCdd,profitKotorTotal:profitKotorTotalCdd,sisaModalTertahan:sisaModalTertahanCdd,estimasiProfitSisa:estimasiProfitSisaCdd,profitItems:salesMatch?salesMatch.items:[],_bulan:bulan,_tanggalHari:day.tanggal,_id:cashDroppingUangMasukData.length});
+                    cashDroppingUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,tagihan:tagihanCdd,totalBayar:totalBayarCdd,sisaTagihan:sisaTagihanCdd,tglBayar:tglBayarCdd,modalTotal:modalTotalCdd,modalAda:modalAdaCdd,proporsiBayar:proporsiBayarCdd,modalProporsional:modalProporsionalCdd,profit:profitCdd,profitKotorTotal:profitKotorTotalCdd,sisaModalTertahan:sisaModalTertahanCdd,estimasiProfitSisa:estimasiProfitSisaCdd,profitItems:salesMatch?salesMatch.items:[],_bulan:bulan,_tanggalHari:day.tanggal,_id:cashDroppingUangMasukData.length});
                 });
             });
         }
         function pumSortDate(d){
-            // Prioritaskan TGL BAYAR (tanggal uang benar-benar masuk) supaya kolom TGL BAYAR
-            // tampil berurutan/kronologis. Faktur yang belum dibayar (tidak punya tglBayar)
-            // tetap diurutkan berdasarkan tanggal transaksi/faktur sebagai fallback.
-            if(d.tglBayar){
-                const parsedBayar=ptParseDMY(d.tglBayar);
-                if(parsedBayar) return parsedBayar.getTime();
-            }
             const parsed=ptParseDMY(d.tglFaktur);
             if(parsed) return parsed.getTime();
             if(d._bulan && d._tanggalHari){
@@ -2759,6 +2756,10 @@
                 if(!isNaN(alt.getTime())) return alt.getTime();
             }
             return 0;
+        }
+        function pumSortTglBayar(d){
+            const parsed=ptParseDMY(d.tglBayar);
+            return parsed?parsed.getTime():0;
         }
         piutangUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
         cashDroppingUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
@@ -2789,13 +2790,20 @@
         const tanggal=document.getElementById('piutangUangMasukTanggal').value;
         const bulan=document.getElementById('piutangUangMasukBulan').value;
         const sales=document.getElementById('piutangUangMasukSales').value;
-        return piutangUangMasukData.filter(d => {
+        const status=document.getElementById('piutangUangMasukStatus')?document.getElementById('piutangUangMasukStatus').value:'';
+        let hasil=piutangUangMasukData.filter(d => {
             if(search && !((d.noFaktur||'').toLowerCase().includes(search)||(d.namaToko||'').toLowerCase().includes(search))) return false;
             if(tanggal && d.tglFaktur!==tanggal) return false;
             if(bulan && d._bulan!==bulan) return false;
             if(sales && d.sales!==sales) return false;
+            if(status==='lunas' && d.statusClass!=='lunas') return false;
+            if(status==='titip' && d.statusClass==='lunas') return false;
             return true;
         });
+        // Saat filter Status = Sudah Lunas, urutkan berdasarkan TGL BAYAR asli supaya kolom itu
+        // tampil kronologis/berurutan (di luar filter ini, urutan tetap ikuti tanggal transaksi).
+        if(status==='lunas'){ hasil=hasil.slice().sort((a,b)=>pumSortTglBayar(a)-pumSortTglBayar(b)); }
+        return hasil;
     }
 
     function getFilteredCashDroppingUangMasuk() {
@@ -2816,7 +2824,11 @@
         return d.statusClass==='lunas'?'<span class="stempel-lunas">Lunas</span>':`<span class="badge pt-${d.statusClass}">${d.statusClass==='overdue'&&d.overdueDays!=null?`${d.overdueDays} hr/Overdue`:'Belum Lunas'}</span>`;
     }
     function pumProfitCellHtml(d) {
-        return d.profit===''?'<span style="color:#94a3b8;">-</span>':`<span style="${d.profit<0?'color:#b91c1c;font-weight:700;':'color:#15803d;font-weight:700;'}">${fmtRp(d.profit)}</span>`;
+        if(d.profit==='' || d.profit==null) return '<span style="color:#94a3b8;">-</span>';
+        const color=d.profit<0?'#b91c1c':'#15803d';
+        const basisPct=(d.tagihan>0 && d.profitKotorTotal!=='' && d.profitKotorTotal!=null)?(d.profitKotorTotal/d.tagihan*100):null;
+        const pctHtml=basisPct!=null?` <span style="font-weight:400;font-size:0.9em;color:${color};">(${basisPct>=0?'':''}${basisPct.toFixed(1)}%)</span>`:'';
+        return `<span style="color:${color};font-weight:700;">${fmtRp(d.profit)}</span>${pctHtml}`;
     }
     function pumPeriodLabel() {
         const bulanVal=document.getElementById('piutangUangMasukBulan').value;
@@ -3043,6 +3055,7 @@
                 <div class="pt-card-row"><span>Nominal</span><span>${fmtRp(d.tagihan)}</span></div>
                 <div class="pt-card-row"><span>Bayar Cash</span><span>${fmtRp(d.bayarCash)}</span></div>
                 <div class="pt-card-row"><span>Bayar Transfer</span><span>${fmtRp(d.bayarTransfer)}</span></div>
+                <div class="pt-card-row"><span>Tgl Bayar</span><span>${d.tglBayar||'-'}</span></div>
                 <div class="pt-card-row highlight"><span>Profit</span><span>${pumProfitCellHtml(d)}</span></div>
             </div>
         `).join('');
@@ -3064,8 +3077,8 @@
         const start=(cashDroppingUangMasukPage-1)*UANG_MASUK_ROWS_PER_PAGE;
         const pageRows=filtered.slice(start,start+UANG_MASUK_ROWS_PER_PAGE);
         const tbody=document.getElementById('cashDroppingUangMasukBody');
-        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="12" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr>'; }
-        else { tbody.innerHTML=pageRows.map((d,i)=>`<tr><td>${start+i+1}</td><td>${d.tglFaktur||'-'}</td><td><span class="faktur-link" onclick="openPumDetail(${d._id},'cash')" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td><td>${d.sales||'-'}</td><td>${d.namaToko||'-'}</td><td>${d.alamat||'-'}</td><td>${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</td><td class="num">${fmtRp(d.tagihan)}</td><td class="num">${fmtRp(d.bayarCash)}</td><td class="num">${fmtRp(d.bayarTransfer)}</td><td class="num">${pumProfitCellHtml(d)}</td><td>${d.ket||'-'}</td></tr>`).join(''); }
+        if(pageRows.length===0){ tbody.innerHTML='<tr><td colspan="13" class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</td></tr>'; }
+        else { tbody.innerHTML=pageRows.map((d,i)=>`<tr><td>${start+i+1}</td><td>${d.tglFaktur||'-'}</td><td><span class="faktur-link" onclick="openPumDetail(${d._id},'cash')" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td><td>${d.sales||'-'}</td><td>${d.namaToko||'-'}</td><td>${d.alamat||'-'}</td><td>${d.kategori==='fitri'?'Minyak Fitri':'Rupa Rupa'}</td><td class="num">${fmtRp(d.tagihan)}</td><td class="num">${fmtRp(d.bayarCash)}</td><td class="num">${fmtRp(d.bayarTransfer)}</td><td>${d.tglBayar||'-'}</td><td class="num">${pumProfitCellHtml(d)}</td><td>${d.ket||'-'}</td></tr>`).join(''); }
         cddRenderCardList(pageRows);
         document.getElementById('cashDroppingUangMasukPageLabel').textContent=`Halaman ${cashDroppingUangMasukPage} dari ${totalPages}`;
         document.getElementById('cashDroppingUangMasukPrevPage').disabled=cashDroppingUangMasukPage<=1;
@@ -3087,7 +3100,7 @@
     // Event listeners Tab 9
     document.getElementById('piutangUangMasukBtnRefresh').addEventListener('click', function(){ refreshPiutangUangMasuk(); showToast('🔄 Data Piutang Tempo & Cash Dropping dimuat ulang.','success'); });
     document.getElementById('piutangUangMasukBtnReset').addEventListener('click', function(){
-        document.getElementById('piutangUangMasukSearch').value=''; document.getElementById('piutangUangMasukTanggal').value=''; document.getElementById('piutangUangMasukBulan').value=''; document.getElementById('piutangUangMasukSales').value=''; piutangUangMasukPage=1; renderPiutangUangMasuk();
+        document.getElementById('piutangUangMasukSearch').value=''; document.getElementById('piutangUangMasukTanggal').value=''; document.getElementById('piutangUangMasukBulan').value=''; document.getElementById('piutangUangMasukSales').value=''; document.getElementById('piutangUangMasukStatus').value=''; piutangUangMasukPage=1; renderPiutangUangMasuk();
     });
     document.getElementById('piutangUangMasukPrevPage').addEventListener('click', function(){ if(piutangUangMasukPage>1){ piutangUangMasukPage--; renderPiutangUangMasuk(); } });
     document.getElementById('piutangUangMasukNextPage').addEventListener('click', function(){ const total=getFilteredPiutangUangMasuk().length; const totalPages=Math.max(1,Math.ceil(total/UANG_MASUK_ROWS_PER_PAGE)); if(piutangUangMasukPage<totalPages){ piutangUangMasukPage++; renderPiutangUangMasuk(); } });
@@ -3106,6 +3119,7 @@
     document.getElementById('piutangUangMasukTanggal').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('piutangUangMasukBulan').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('piutangUangMasukSales').addEventListener('change', debouncePiutangUangMasuk);
+    document.getElementById('piutangUangMasukStatus').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('cashDroppingUangMasukSearch').addEventListener('input', debounceCashDroppingUangMasuk);
     document.getElementById('cashDroppingUangMasukTanggal').addEventListener('change', debounceCashDroppingUangMasuk);
     document.getElementById('cashDroppingUangMasukBulan').addEventListener('change', debounceCashDroppingUangMasuk);
