@@ -5645,6 +5645,21 @@
                 return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
                     'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
             }
+            // Beberapa kegagalan (mis. tepat setelah reload halaman, sesi
+            // login belum "hangat") sifatnya sementara. Coba ulang dulu
+            // beberapa kali sebelum benar-benar dianggap gagal, supaya
+            // data tidak kelihatan "kosong" gara-gara kedip sesaat.
+            async _withRetry(fn, attempts = 3, delayMs = 500) {
+                let lastErr;
+                for (let i = 0; i < attempts; i++) {
+                    try { return await fn(); }
+                    catch (e) {
+                        lastErr = e;
+                        if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+                    }
+                }
+                throw lastErr;
+            }
             _unwrap(row) {
                 // Gabungkan isi kolom `data` (jsonb) + `id` di level atas,
                 // supaya bentuknya identik dengan row hasil LocalTable.
@@ -5670,20 +5685,24 @@
                 }
             }
             async toArray() {
-                const { data, error } = await this.client
-                    .from(this.table)
-                    .select('id,data,updated_at')
-                    .or('deleted.is.null,deleted.eq.false');
-                if (error) throw error;
-                return (data || []).map(row => this._unwrap(row));
+                return await this._withRetry(async () => {
+                    const { data, error } = await this.client
+                        .from(this.table)
+                        .select('id,data,updated_at')
+                        .or('deleted.is.null,deleted.eq.false');
+                    if (error) throw error;
+                    return (data || []).map(row => this._unwrap(row));
+                });
             }
             async count() {
-                const { count, error } = await this.client
-                    .from(this.table)
-                    .select('id', { count: 'exact', head: true })
-                    .or('deleted.is.null,deleted.eq.false');
-                if (error) throw error;
-                return count || 0;
+                return await this._withRetry(async () => {
+                    const { count, error } = await this.client
+                        .from(this.table)
+                        .select('id', { count: 'exact', head: true })
+                        .or('deleted.is.null,deleted.eq.false');
+                    if (error) throw error;
+                    return count || 0;
+                });
             }
             async clear() {
                 // Dipakai saat restore-dari-backup (hapus semua baris, akan
@@ -6029,19 +6048,32 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            await terapkanModeJaringanAwal();
-            await cekKoneksiFirestore();
-        });
-        window.addEventListener('online', () => { if (!modeOfflineManual) cekKoneksiFirestore(); });
-        window.addEventListener('offline', function() {
-            if (modeOfflineManual) return; // badge sudah menunjukkan mode offline manual, jangan ditimpa
-            const badge = document.getElementById('fsConnBadge') || pasangIndikatorKoneksi();
-            badge.textContent = '🔴 Offline — data disimpan lokal, akan sinkron saat online lagi';
-            badge.style.background = '#ffe3e3'; badge.style.color = '#c92a2a';
-        });
-        setInterval(cekPengingatSinkron, 5 * 60000); // cek tiap 5 menit
-        document.addEventListener('DOMContentLoaded', () => setTimeout(cekPengingatSinkron, 3000));
+        // ================================================================
+        // DINONAKTIFKAN: badge "🔄 Sinkron Sekarang" / "Server tidak tersedia"
+        // di atas ini adalah peninggalan sistem FIRESTORE LAMA (sudah
+        // dihapus total). Badge itu SELALU menampilkan "server tidak
+        // tersedia" apa pun kondisinya, karena mengecek status Firestore
+        // yang memang tidak pernah aktif lagi — jadi menyesatkan sejak
+        // pindah ke Supabase. sinkronSekarang() pun cuma me-reload
+        // halaman biasa, tidak benar-benar melakukan apa-apa yang
+        // istimewa. Dimatikan di sini supaya tidak membingungkan.
+        // Kegagalan memuat data sales/cashIncome dari Supabase sekarang
+        // ditangani lewat toast peringatan di loadSalesData() &
+        // loadAllCashDataBeforePtRefresh() masing-masing.
+        // ================================================================
+        // document.addEventListener('DOMContentLoaded', async () => {
+        //     await terapkanModeJaringanAwal();
+        //     await cekKoneksiFirestore();
+        // });
+        // window.addEventListener('online', () => { if (!modeOfflineManual) cekKoneksiFirestore(); });
+        // window.addEventListener('offline', function() {
+        //     if (modeOfflineManual) return;
+        //     const badge = document.getElementById('fsConnBadge') || pasangIndikatorKoneksi();
+        //     badge.textContent = '🔴 Offline — data disimpan lokal, akan sinkron saat online lagi';
+        //     badge.style.background = '#ffe3e3'; badge.style.color = '#c92a2a';
+        // });
+        // setInterval(cekPengingatSinkron, 5 * 60000);
+        // document.addEventListener('DOMContentLoaded', () => setTimeout(cekPengingatSinkron, 3000));
 
         // ================================================================
         // STICKY FILTER BAR — filter tetap kelihatan di bawah header & tab
@@ -6383,6 +6415,7 @@
                 });
             } catch (e) { 
                 console.error('Error loading all cash data:', e);
+                showToast('⚠️ Gagal memuat data uang masuk dari server: ' + (e && e.message ? e.message : 'periksa koneksi') + '. Data BUKAN terhapus — coba muat ulang halaman.', 'warning');
             }
         }
 
@@ -6845,7 +6878,9 @@
                 salesData.sort((a, b) => String(a.Tanggal || '').localeCompare(String(b.Tanggal || '')) ||
                     String(a['No.Faktur'] || '').localeCompare(String(b['No.Faktur'] || '')));
             } catch (e) { console.warn('Gagal muat sales:', e);
-                salesData = []; }
+                salesData = [];
+                showToast('⚠️ Gagal memuat data penjualan dari server: ' + (e && e.message ? e.message : 'periksa koneksi') + '. Data BUKAN terhapus — coba muat ulang halaman.', 'warning');
+            }
         }
 
         async function saveSalesData() {
