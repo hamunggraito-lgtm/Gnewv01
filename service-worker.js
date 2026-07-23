@@ -3,7 +3,7 @@
 // Naikkan angka versi di CACHE_NAME setiap kali update file,
 // supaya browser mengambil versi baru (bukan cache lama).
 // ================================================================
-const CACHE_NAME = 'gamas-2026-v8';
+const CACHE_NAME = 'gamas-2026-v7';
 
 const APP_SHELL = [
   './',
