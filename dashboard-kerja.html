@@ -7406,6 +7406,96 @@
             renderSales();
         });
 
+        // ================================================================
+        // OPTIMASI PERFORMA TAB 1 (Bank Data Penjualan): Virtual Rendering
+        // ----------------------------------------------------------------
+        // Kalau baris yang harus ditampilkan > VIRTUAL_ROW_THRESHOLD, tabel
+        // tidak lagi membuat elemen <tr> untuk SEMUA baris sekaligus (yang
+        // bikin berat kalau datanya ribuan baris). Sebagai gantinya, hanya
+        // baris yang kelihatan di area scroll (+ sedikit buffer atas/bawah)
+        // yang dibuatkan elemen DOM-nya. Baris yang belum kelihatan hanya
+        // diwakili 1 baris "spacer" kosong (biar tinggi scrollbar tetap pas)
+        // dan baru dirender jadi <tr> asli begitu user scroll ke situ.
+        // Total/Profit tetap dihitung untuk SEMUA baris (bukan cuma yang
+        // kelihatan) supaya info lain (daftar faktur, ringkasan piutang,
+        // dll) tetap akurat.
+        // ================================================================
+        let salesVirtualDisplayRows = [];
+        let salesVirtualIndexMap = new Map();
+        let salesVirtualCardStatusMap = new Map();
+        const VIRTUAL_ROW_THRESHOLD = 150;
+        const VIRTUAL_BUFFER_ROWS = 10;
+        let salesRowHeightPx = 33; // dikalibrasi otomatis dari baris asli saat data sedikit
+
+        function buildSalesRowHtml(r, salesIndexMap) {
+            const jumlah = parseNumber(r.Jumlah);
+            const harga = parseNumber(r['Harga Jual']);
+            const hargaBeli = r['Harga Beli'] !== undefined && r['Harga Beli'] !== '' && r[
+                'Harga Beli'] !== null ? parseNumber(r['Harga Beli']) : null;
+            const disc = parseNumber(r.Disc);
+            const total = r.Total !== undefined ? r.Total : (jumlah * harga) - disc;
+            const profit = hargaBeli !== null ? (total - (hargaBeli * jumlah)) : null;
+            const gidx = salesIndexMap.get(r);
+            const cbChecked = salesRowsSelected.has(gidx) ? 'checked' : '';
+            const noFakturSafe = escapeHtml(String(r['No.Faktur'] || ''));
+            const sudahDiedit = !!r._Diedit;
+            const fakturLinkStyle = sudahDiedit ?
+                'color:#b45309;font-weight:700;text-decoration:underline;' :
+                'color:#1f4e78;font-weight:700;text-decoration:underline;';
+            const fakturLinkTitle = sudahDiedit ? ' title="Faktur ini pernah diedit dari modal detail"' : '';
+            return `<tr><td><input type="checkbox" class="sales-trash-checkbox" data-gidx="${gidx}" ${cbChecked}></td><td>${fmtTanggal(r.Tanggal)}</td><td>${noFakturSafe ? `<a href="#" class="tab1-faktur-link" data-faktur="${noFakturSafe}" style="${fakturLinkStyle}"${fakturLinkTitle}>${sudahDiedit ? '✏️ ' : ''}${noFakturSafe}</a>` : ''}</td><td>${r.Produk || ''}</td><td class="num">${jumlah}</td><td>${r.Satuan || ''}</td><td class="num">${fmtRp(harga)}</td><td class="num">${hargaBeli !== null ? fmtRp(hargaBeli) : '-'}</td><td class="num">${fmtRp(disc)}</td><td class="num">${fmtRp(total)}</td><td class="num">${profit !== null ? fmtRp(profit) : '-'}</td><td>${r.Sales || ''}</td><td>${r.Customer || ''}</td><td>${r.Alamat || ''}</td><td><span class="badge ${r.Pembayaran === 'Cash' ? 'cash' : 'tempo'}">${r.Pembayaran || 'Tempo'}</span></td></tr>`;
+        }
+
+        function renderSalesTableWindow() {
+            const tbody = document.getElementById('salesTableBody');
+            if (!tbody) return;
+            const rows = salesVirtualDisplayRows;
+            const salesIndexMap = salesVirtualIndexMap;
+            if (!rows || rows.length === 0) return;
+            const total = rows.length;
+            if (total <= VIRTUAL_ROW_THRESHOLD) {
+                // Data sedikit: render biasa seperti sebelumnya (tidak perlu virtualisasi).
+                tbody.innerHTML = rows.map(r => buildSalesRowHtml(r, salesIndexMap)).join('');
+                const firstRow = tbody.querySelector('tr');
+                if (firstRow) {
+                    const h = firstRow.getBoundingClientRect().height;
+                    if (h > 10) salesRowHeightPx = h; // kalibrasi tinggi baris asli
+                }
+                return;
+            }
+            const wrap = document.getElementById('tab1TableWrap');
+            const scrollTop = wrap ? wrap.scrollTop : 0;
+            const viewH = (wrap ? wrap.clientHeight : 0) || 485;
+            let start = Math.floor(scrollTop / salesRowHeightPx) - VIRTUAL_BUFFER_ROWS;
+            if (start < 0) start = 0;
+            const count = Math.ceil(viewH / salesRowHeightPx) + VIRTUAL_BUFFER_ROWS * 2;
+            let end = start + count;
+            if (end > total) end = total;
+            if (start > end) start = end;
+            const topH = start * salesRowHeightPx;
+            const botH = (total - end) * salesRowHeightPx;
+            let html = '';
+            if (topH > 0) html +=
+                `<tr class="vrow-spacer" aria-hidden="true" style="height:${topH}px;"><td colspan="15" style="padding:0;border:0;background:transparent;"></td></tr>`;
+            for (let i = start; i < end; i++) html += buildSalesRowHtml(rows[i], salesIndexMap);
+            if (botH > 0) html +=
+                `<tr class="vrow-spacer" aria-hidden="true" style="height:${botH}px;"><td colspan="15" style="padding:0;border:0;background:transparent;"></td></tr>`;
+            tbody.innerHTML = html;
+        }
+        (function initSalesVirtualScroll() {
+            const wrap = document.getElementById('tab1TableWrap');
+            if (!wrap) return;
+            let raf = null;
+            wrap.addEventListener('scroll', function() {
+                if (salesVirtualDisplayRows.length <= VIRTUAL_ROW_THRESHOLD) return;
+                if (raf) return;
+                raf = requestAnimationFrame(function() {
+                    raf = null;
+                    renderSalesTableWindow();
+                });
+            });
+        })();
+
         function renderSales() {
             const beforeQuickFilter = getFilteredSales();
             const statusMapForChips = updateTab1Chips(beforeQuickFilter);
@@ -7430,38 +7520,40 @@
                 document.getElementById('salesNextDate').disabled = salesCurrentDateIndex >= uniqueDates.length - 1;
                 document.getElementById('salesPager').style.display = 'flex';
             }
+            // Hitung Total untuk SEMUA baris hasil filter (murah, cuma aritmatika,
+            // bukan bikin elemen DOM) supaya daftar faktur di sidebar kiri &
+            // ringkasan piutang tetap akurat walau tabelnya divirtualisasi.
+            const salesIndexMap = new Map();
+            salesData.forEach((r, i) => salesIndexMap.set(r, i));
+            rows.forEach(r => {
+                const jumlah = parseNumber(r.Jumlah);
+                const harga = parseNumber(r['Harga Jual']);
+                const disc = parseNumber(r.Disc);
+                r.Total = (jumlah * harga) - disc;
+            });
             renderTab1SplitList(rows);
             const displayRows = tab1SelectedFaktur ?
                 rows.filter(r => normFaktur(r['No.Faktur']) === normFaktur(tab1SelectedFaktur)) : rows;
+            salesVirtualCardStatusMap = statusMapForChips;
             if (displayRows.length === 0) {
                 tbody.innerHTML = tab1SelectedFaktur ?
                     '<tr><td colspan="15" class="empty-msg">📂 Faktur ini tidak ada di data yang tampil saat ini.</td></tr>' :
                     '<tr><td colspan="15" class="empty-msg">📂 Tidak ada data. Import Excel atau Tambah transaksi.</td></tr>';
+                salesVirtualDisplayRows = [];
+                salesVirtualIndexMap = salesIndexMap;
+                if (tab1ViewMode === 'card') renderSalesCards([], new Map(), statusMapForChips);
             } else {
-                const salesIndexMap = new Map();
-                salesData.forEach((r, i) => salesIndexMap.set(r, i));
-                tbody.innerHTML = displayRows.map(r => {
-                    const jumlah = parseNumber(r.Jumlah);
-                    const harga = parseNumber(r['Harga Jual']);
-                    const hargaBeli = r['Harga Beli'] !== undefined && r['Harga Beli'] !== '' && r[
-                        'Harga Beli'] !== null ? parseNumber(r['Harga Beli']) : null;
-                    const disc = parseNumber(r.Disc);
-                    const total = (jumlah * harga) - disc;
-                    r.Total = total;
-                    const profit = hargaBeli !== null ? (total - (hargaBeli * jumlah)) : null;
-                    const gidx = salesIndexMap.get(r);
-                    const cbChecked = salesRowsSelected.has(gidx) ? 'checked' : '';
-                    const noFakturSafe = escapeHtml(String(r['No.Faktur'] || ''));
-                    const sudahDiedit = !!r._Diedit;
-                    const fakturLinkStyle = sudahDiedit ?
-                        'color:#b45309;font-weight:700;text-decoration:underline;' :
-                        'color:#1f4e78;font-weight:700;text-decoration:underline;';
-                    const fakturLinkTitle = sudahDiedit ? ' title="Faktur ini pernah diedit dari modal detail"' : '';
-                    return `<tr><td><input type="checkbox" class="sales-trash-checkbox" data-gidx="${gidx}" ${cbChecked}></td><td>${fmtTanggal(r.Tanggal)}</td><td>${noFakturSafe ? `<a href="#" class="tab1-faktur-link" data-faktur="${noFakturSafe}" style="${fakturLinkStyle}"${fakturLinkTitle}>${sudahDiedit ? '✏️ ' : ''}${noFakturSafe}</a>` : ''}</td><td>${r.Produk || ''}</td><td class="num">${jumlah}</td><td>${r.Satuan || ''}</td><td class="num">${fmtRp(harga)}</td><td class="num">${hargaBeli !== null ? fmtRp(hargaBeli) : '-'}</td><td class="num">${fmtRp(disc)}</td><td class="num">${fmtRp(total)}</td><td class="num">${profit !== null ? fmtRp(profit) : '-'}</td><td>${r.Sales || ''}</td><td>${r.Customer || ''}</td><td>${r.Alamat || ''}</td><td><span class="badge ${r.Pembayaran === 'Cash' ? 'cash' : 'tempo'}">${r.Pembayaran || 'Tempo'}</span></td></tr>`;
-                }).join('');
-                renderSalesCards(displayRows, salesIndexMap, statusMapForChips);
+                salesVirtualDisplayRows = displayRows;
+                salesVirtualIndexMap = salesIndexMap;
+                const wrapEl = document.getElementById('tab1TableWrap');
+                if (wrapEl) wrapEl.scrollTop = 0; // data berganti -> mulai dari atas lagi
+                renderSalesTableWindow();
+                // Kartu (mode "🗂️ Kartu") cuma dirender kalau memang sedang dilihat,
+                // biar tidak dobel kerja render tabel + kartu tiap kali data berubah.
+                if (tab1ViewMode === 'card') {
+                    renderSalesCards(displayRows, salesIndexMap, statusMapForChips);
+                }
             }
-            if (displayRows.length === 0) renderSalesCards([], new Map(), statusMapForChips);
             updateSalesSelectedInfo();
             document.getElementById('salesTotalData').textContent = displayRows.length + ' data' +
                 (tab1SelectedFaktur ? ' (faktur ' + tab1SelectedFaktur + ')' : '');
@@ -8084,10 +8176,24 @@
                     countEl.style.display = 'none';
                 }
             }
-            const allCbs = document.querySelectorAll('.sales-trash-checkbox');
-            const checkedCbs = document.querySelectorAll('.sales-trash-checkbox:checked');
+            // Dihitung dari daftar baris yang sedang tampil (salesVirtualDisplayRows),
+            // bukan dari checkbox yang kebetulan ada di DOM — karena kalau tabelnya
+            // divirtualisasi (data banyak), baris di luar layar tidak punya elemen
+            // checkbox sama sekali.
             const selectAll = document.getElementById('salesSelectAll');
-            if (selectAll) selectAll.checked = (allCbs.length > 0 && checkedCbs.length === allCbs.length);
+            if (selectAll) {
+                const rowsNow = salesVirtualDisplayRows;
+                const idxMapNow = salesVirtualIndexMap;
+                let totalCount = 0,
+                    selectedCount = 0;
+                rowsNow.forEach(r => {
+                    const gidx = idxMapNow.get(r);
+                    if (gidx === undefined) return;
+                    totalCount++;
+                    if (salesRowsSelected.has(gidx)) selectedCount++;
+                });
+                selectAll.checked = (totalCount > 0 && selectedCount === totalCount);
+            }
 
             // Floating toolbar: muncul otomatis begitu ada baris yang dicentang,
             // jadi tidak perlu cari-cari tombol lagi di ujung tabel.
@@ -8113,11 +8219,20 @@
 
         document.getElementById('salesSelectAll').addEventListener('change', function() {
             const checked = this.checked;
-            document.querySelectorAll('.sales-trash-checkbox').forEach(cb => {
-                cb.checked = checked;
-                const gidx = parseInt(cb.dataset.gidx, 10);
+            // Pakai daftar baris logis (bukan cuma checkbox yang ada di DOM) supaya
+            // "pilih semua" tetap memilih SEMUA baris yang sedang tampil, walau
+            // sebagian belum dirender ke DOM karena tabelnya divirtualisasi.
+            const rowsNow = salesVirtualDisplayRows;
+            const idxMapNow = salesVirtualIndexMap;
+            rowsNow.forEach(r => {
+                const gidx = idxMapNow.get(r);
+                if (gidx === undefined) return;
                 if (checked) salesRowsSelected.add(gidx); else salesRowsSelected.delete(gidx);
             });
+            renderSalesTableWindow();
+            if (tab1ViewMode === 'card') {
+                renderSalesCards(rowsNow, idxMapNow, salesVirtualCardStatusMap || new Map());
+            }
             updateSalesSelectedInfo();
         });
 
