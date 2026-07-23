@@ -1101,6 +1101,51 @@
         @media (max-width: 640px) {
             #cashCardList.show { grid-template-columns: 1fr; }
         }
+        /* Kartu Cek Piutang (Tab 4): disamakan seperti Cek Cash -> 2 kolom sejajar */
+        #ptCardList.show {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            align-content: start;
+        }
+        @media (max-width: 640px) {
+            #ptCardList.show { grid-template-columns: 1fr; }
+        }
+        /* Blok info "Total Tagihan (awal transaksi)" & "Sisa Tagihan" di kartu Cek Piutang,
+           dibuat 2 kolom sejajar supaya kedua angka mudah dibandingkan sekilas. */
+        .pt-card-tagihan-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 10px;
+            margin-top: 8px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            border-top: 1px dashed #e8ecf4;
+            border-bottom: 1px dashed #e8ecf4;
+        }
+        .pt-card-tagihan-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            min-width: 0;
+        }
+        .pt-card-tagihan-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+        .pt-card-tagihan-value {
+            font-size: 13px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .pt-card-tagihan-value.belum {
+            color: #b91c1c;
+        }
+        .pt-card-tagihan-value.lunas {
+            color: #15803d;
+        }
         .sales-card-stempel-lunas {
             position: absolute;
             top: 8px;
@@ -9294,6 +9339,19 @@
             }
         });
 
+        // Warna latar untuk kelompok No.Faktur yang sama di kartu Cek Piutang.
+        // Deterministik (hash dari No.Faktur) supaya faktur yg sama SELALU dapat
+        // warna yg sama walau data di-render ulang / pindah halaman.
+        function ptFakturColorPalette(key) {
+            const palette = ['#e0f2fe', '#fce7f3', '#fef9c3', '#dcfce7', '#ede9fe', '#ffe4e6', '#e0e7ff',
+                '#fee2e2', '#d1fae5', '#fef3c7', '#cffafe', '#f3e8ff'
+            ];
+            const s = String(key || '');
+            let hash = 0;
+            for (let i = 0; i < s.length; i++) { hash = s.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
+            return palette[Math.abs(hash) % palette.length];
+        }
+
         // ===== Mode Kartu untuk Cek Piutang (Tab 4) — sama seperti Cek Cash ===== //
         function renderPiutangCards(pageRows, start) {
             const wrap = document.getElementById('ptCardList');
@@ -9302,33 +9360,54 @@
                 wrap.innerHTML = `<div class="sales-card-empty">📂 Belum ada data piutang tempo.</div>`;
                 return;
             }
+            // Hitung berapa kali tiap No.Faktur muncul (1 faktur bisa punya beberapa baris
+            // produk = beberapa kartu). Kalau muncul >1 kali, kartu2-nya diberi warna latar
+            // yang sama supaya mudah dikenali sebagai satu kelompok faktur.
+            const fakturCountMap = {};
+            (window._ptRowsCache || pageRows).forEach(r => {
+                const k = normFaktur(r.noFaktur);
+                fakturCountMap[k] = (fakturCountMap[k] || 0) + 1;
+            });
             wrap.innerHTML = pageRows.map((r, i) => {
                 const realIdx = start + i;
                 const checked = ptChecked[r.noFaktur] ? 'checked' : '';
-                const sisaTagihan = ptSisaTagihanBaris(r);
+                const sisaTagihan = r.statusClass === 'lunas' ? 0 : ptSisaTagihanBaris(r);
                 const noFakturSafe = escapeHtml(String(r.noFaktur || ''));
+                const fakturKey = normFaktur(r.noFaktur);
+                const isGrupFaktur = (fakturCountMap[fakturKey] || 0) > 1;
+                // Warna kelompok tidak dipakai saat kartu sedang dicentang (selected), supaya
+                // highlight seleksi (ungu muda) tetap terlihat jelas.
+                const bgStyle = (isGrupFaktur && !checked) ? ` style="background:${ptFakturColorPalette(fakturKey)};"` : '';
                 const statusBadge = r.statusClass === 'lunas' ?
                     '<span class="badge lunas-mini">✅ Lunas</span>' :
                     `<span class="badge pt-${r.statusClass}">${r.statusClass === 'overdue' && r.overdueDays != null ? `${r.overdueDays} hr/Overdue` : ptStatusLabel(r.statusClass)}</span>`;
-                return `<div class="sales-card${checked ? ' selected' : ''}">
+                return `<div class="sales-card${checked ? ' selected' : ''}"${bgStyle}>
                     ${r.statusClass === 'lunas' ? '<div class="sales-card-stempel-lunas">Lunas</div>' : ''}
                     <div class="sales-card-top">
                         <div class="sales-card-top-left">
                             <input type="checkbox" class="pt-row-checkbox" data-faktur="${noFakturSafe}" ${checked}>
-                            <a href="#" class="pt-faktur-link sales-card-faktur" data-idx="${realIdx}">${piutangNotesMap[r.noFaktur] ? '📝 ' : ''}${noFakturSafe}</a>
+                            <a href="#" class="pt-faktur-link sales-card-faktur" data-idx="${realIdx}">${piutangNotesMap[r.noFaktur] ? '📝 ' : ''}${noFakturSafe}${isGrupFaktur ? ' <span title="Faktur ini punya beberapa baris produk">🔗</span>' : ''}</a>
                         </div>
                         <span class="sales-card-date">${fmtTanggalYY(fmtTanggal(r.tanggal))}</span>
                     </div>
                     <div class="sales-card-produk">${escapeHtml(r.customer || '-')}</div>
                     <div class="sales-card-qty">${escapeHtml(r.alamat || '-')}${r.produkNama ? ' · ' + escapeHtml(r.produkNama) : ''}</div>
+                    <div class="pt-card-tagihan-grid">
+                        <div class="pt-card-tagihan-item">
+                            <div class="pt-card-tagihan-label">Total Tagihan (awal transaksi)</div>
+                            <div class="pt-card-tagihan-value">${fmtRp(r.total)}</div>
+                        </div>
+                        <div class="pt-card-tagihan-item">
+                            <div class="pt-card-tagihan-label">Sisa Tagihan</div>
+                            <div class="pt-card-tagihan-value ${r.statusClass === 'lunas' ? 'lunas' : 'belum'}">${fmtRp(sisaTagihan)}</div>
+                        </div>
+                    </div>
                     <div class="sales-card-mid">
-                        <span class="sales-card-total">${fmtRp(r.total)}</span>
                         <span class="sales-card-badges"><span class="badge pt-tercatat">${r.kategori === 'fitri' ? 'Minyak Fitri' : 'Rupa Rupa'}</span> ${statusBadge}</span>
                     </div>
                     <div class="sales-card-foot">
                         <span><b>${escapeHtml(r.sales || '-')}</b></span>
                         <span>Jth Tempo: ${r.jt ? fmtTanggalYY(r.jt) : '-'}</span>
-                        ${r.statusClass !== 'lunas' ? `<span>Sisa: <b>${fmtRp(sisaTagihan)}</b></span>` : ''}
                     </div>
                 </div>`;
             }).join('');
