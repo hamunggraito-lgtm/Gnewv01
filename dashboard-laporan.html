@@ -3026,26 +3026,33 @@
             // Supaya PRODUK terlihat jelas per baris (seperti tabel Bank Data Penjualan), faktur yang sama
             // ditulis berulang untuk tiap produk, masing-masing dengan Jumlah & Satuan-nya sendiri.
             const items=(Array.isArray(d.profitItems)&&d.profitItems.length>0)?d.profitItems:[{produk:d.produk||'-',qty:'',satuan:''}];
+            const isGroup=items.length>1;
             return items.map((it,idxItem)=>{
                 const isFirst=idxItem===0;
                 const groupBorder=isFirst&&i>0?'border-top:2px solid #cbd5e1;':'';
-                return `<tr class="${rowClass}" style="${groupBorder}">
+                // Baris lanjutan (produk ke-2, ke-3, dst) dari faktur yang sama diberi
+                // background abu-abu muda + border kiri, supaya kelihatan jelas "masih
+                // 1 faktur" meskipun kolom Tagihan/Status/dll-nya dikosongkan (nilainya
+                // memang milik faktur, bukan per produk, jadi cukup ditulis 1x saja).
+                const contRowStyle=(!isFirst&&isGroup)?'background:#f8fafc;border-left:3px solid #c7d2fe;':'';
+                const produkCell=(!isFirst&&isGroup)?`<span style="color:#94a3b8;margin-right:3px;">↳</span>${escapeHtml(it.produk||'-')}`:escapeHtml(it.produk||'-');
+                return `<tr class="${rowClass}" style="${groupBorder}${contRowStyle}">
                 <td><span class="faktur-link" onclick="openPumDetail(${d._id})" title="Klik untuk lihat detail faktur">${d.noFaktur||'-'}</span></td>
                 <td>${d.tglFaktur||'-'}</td>
                 <td>${d.namaToko||'-'}</td>
                 <td>${d.alamat||'-'}</td>
                 <td>${d.sales||'-'}</td>
                 <td><span class="badge pt-tercatat">${d.kategori==='fitri'?'MINYAK FITRI':'RUPA RUPA'}</span></td>
-                <td style="font-weight:600;">${escapeHtml(it.produk||'-')}</td>
+                <td style="font-weight:600;">${produkCell}</td>
                 <td class="num">${it.qty!==''&&it.qty!=null?it.qty:'-'}</td>
                 <td>${it.satuan||'-'}</td>
-                <td class="num">${isFirst?fmtRp(d.tagihan):''}</td>
-                <td class="num" style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${isFirst?fmtRp(d.sisaTagihan):''}</td>
-                <td>${isFirst?(d.jatuhTempo||'-')+(d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''):''}</td>
-                <td>${isFirst?statusBadge:''}</td>
-                <td>${isFirst?(d.tglBayar||'-'):''}</td>
-                <td class="num">${isFirst?fmtRp(d.totalBayar):''}</td>
-                <td class="num">${isFirst?profitCell:''}</td>
+                <td class="num">${isFirst?fmtRp(d.tagihan):'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td class="num" style="${d.sisaTagihan>0.5?'color:#b91c1c;font-weight:700;':''}">${isFirst?fmtRp(d.sisaTagihan):'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td>${isFirst?(d.jatuhTempo||'-')+(d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''):'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td>${isFirst?statusBadge:'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td>${isFirst?(d.tglBayar||'-'):'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td class="num">${isFirst?fmtRp(d.totalBayar):'<span style="color:#cbd5e1;">"</span>'}</td>
+                <td class="num">${isFirst?profitCell:'<span style="color:#cbd5e1;">"</span>'}</td>
                 <td>${isFirst?(d.ket||'-'):''}</td>
             </tr>`;
             }).join('');
@@ -3059,11 +3066,13 @@
         document.getElementById('badgePiutangUangMasuk').textContent=filtered.length;
     }
 
+    let _pumDetailCurrentCtx=null;
     function openPumDetail(id, source) {
         source = source || 'piutang';
         const dataArr = source==='cash' ? cashDroppingUangMasukData : piutangUangMasukData;
         const d=dataArr.find(row=>row._id===id);
         if(!d){ showToast('⚠️ Data faktur tidak ditemukan.','warning'); return; }
+        _pumDetailCurrentCtx={id, source, noFaktur:d.noFaktur, tglFaktur:d.tglFaktur, namaToko:d.namaToko, sales:d.sales, alamat:d.alamat};
         const isTempo = source!=='cash';
         document.getElementById('pumDetailTitle').textContent=`🧾 Detail Faktur - ${d.noFaktur||'-'}`;
         const statusBadge = isTempo
@@ -3123,7 +3132,19 @@
                 ${!d.modalAda?`<div class="pum-warn-box">⚠️ Harga Beli belum lengkap di Bank Data Penjualan untuk faktur ini, sehingga Profit belum bisa dihitung secara akurat.</div>`:''}`;
         } else {
             profitSectionHtml=`<div class="pum-section-title">💰 Rincian Perhitungan Profit</div>
-                <div class="pum-warn-box">⚠️ Tidak ditemukan data produk/Harga Beli yang cocok di Bank Data Penjualan untuk faktur ini (kemungkinan No. Faktur belum tercatat di sana), sehingga Profit belum bisa dihitung.</div>`;
+                <div class="pum-warn-box">⚠️ Tidak ditemukan data produk/Harga Beli yang cocok di Bank Data Penjualan untuk faktur ini (kemungkinan No. Faktur belum tercatat di sana), sehingga Profit belum bisa dihitung.</div>
+                <div class="pum-section-title">➕ Lengkapi Data Produk Faktur Ini</div>
+                <div style="font-size:9.5px;color:#64748b;margin:-4px 0 6px 0;">Isi data produk faktur ini di bawah (boleh lebih dari 1 baris kalau produknya beragam), lalu klik <strong>Simpan &amp; Hitung Profit</strong> — data otomatis masuk ke Bank Data Penjualan dan Profit langsung terhitung.</div>
+                <div style="overflow-x:auto;">
+                <table class="pum-profit-table" id="pumAddProdukTable">
+                    <thead><tr><th>Produk</th><th class="num">Qty</th><th>Satuan</th><th class="num">Harga Jual</th><th class="num">Harga Beli</th><th class="num">Disc</th><th class="num">Total</th><th></th></tr></thead>
+                    <tbody id="pumAddProdukTbody">${pumAddProdukRowHtml()}</tbody>
+                </table>
+                </div>
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-outline btn-sm" id="pumAddProdukBtnTambahBaris" style="margin:0;">➕ Tambah Baris</button>
+                    <button type="button" class="btn btn-success btn-sm" id="pumAddProdukBtnSimpan" style="margin:0;">💾 Simpan &amp; Hitung Profit</button>
+                </div>`;
         }
         const infoRowsTempo = isTempo ? `
                 <div><strong>Jatuh Tempo:</strong> ${d.jatuhTempo||'-'}${d.overdueDays!=null?` <span style="color:#b91c1c;font-weight:700;">(${d.overdueDays} hr)</span>`:''}</div>
@@ -3154,7 +3175,132 @@
             ${profitSectionHtml}
         `;
         document.getElementById('pumDetailModal').classList.add('show');
+        if(typeof refreshProdukMasterDatalist==='function') refreshProdukMasterDatalist();
     }
+
+    // ================================================================
+    // FORM "LENGKAPI DATA PRODUK" di dalam modal Detail Faktur
+    // (muncul saat Profit belum bisa dihitung karena faktur belum
+    // tercatat di Bank Data Penjualan). Simpan di sini akan
+    // menambahkan baris ke Bank Data Penjualan (salesData) supaya
+    // Profit langsung otomatis terhitung.
+    // ================================================================
+    function pumAddProdukRowHtml(){
+        const inpStyle='box-sizing:border-box;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:10.5px;';
+        return `<tr>
+            <td><input type="text" class="pum-ap-produk" list="produkMasterDatalist" placeholder="Nama produk" style="width:150px;${inpStyle}"></td>
+            <td><input type="text" inputmode="decimal" class="pum-ap-qty" placeholder="0" style="width:55px;text-align:right;${inpStyle}"></td>
+            <td><input type="text" class="pum-ap-satuan" placeholder="pcs" style="width:55px;${inpStyle}"></td>
+            <td><input type="text" inputmode="numeric" class="pum-ap-hargajual" placeholder="0" style="width:90px;text-align:right;${inpStyle}"></td>
+            <td><input type="text" inputmode="numeric" class="pum-ap-hargabeli" placeholder="0" style="width:90px;text-align:right;${inpStyle}"></td>
+            <td><input type="text" inputmode="numeric" class="pum-ap-disc" placeholder="0" style="width:70px;text-align:right;${inpStyle}"></td>
+            <td class="num pum-ap-total" style="font-weight:700;color:#1f2937;">Rp 0</td>
+            <td style="text-align:center;"><button type="button" class="pum-ap-hapus" title="Hapus baris" style="color:#dc3545;background:none;border:none;font-size:15px;cursor:pointer;line-height:1;">&times;</button></td>
+        </tr>`;
+    }
+    function pumRecalcRowTotal(tr){
+        const qty=parseAngka(tr.querySelector('.pum-ap-qty').value);
+        const hj=parseAngka(tr.querySelector('.pum-ap-hargajual').value);
+        const disc=parseAngka(tr.querySelector('.pum-ap-disc').value);
+        const total=Math.max(0,(qty*hj)-disc);
+        const totalEl=tr.querySelector('.pum-ap-total');
+        if(totalEl) totalEl.textContent=fmtRp(total);
+    }
+    function pumFindIdAfterRefresh(source, noFaktur, tglFaktur, namaToko){
+        const arr=source==='cash'?cashDroppingUangMasukData:piutangUangMasukData;
+        const nf=normFaktur(noFaktur);
+        let found=arr.find(r=>normFaktur(r.noFaktur)===nf && r.tglFaktur===tglFaktur && (r.namaToko||'')===(namaToko||''));
+        if(!found) found=arr.find(r=>normFaktur(r.noFaktur)===nf);
+        return found?found._id:null;
+    }
+    async function pumSimpanTambahProduk(){
+        const ctx=_pumDetailCurrentCtx;
+        if(!ctx){ showToast('⚠️ Konteks faktur tidak ditemukan, coba buka ulang detail fakturnya.','warning'); return; }
+        const tbody=document.getElementById('pumAddProdukTbody');
+        if(!tbody) return;
+        const trs=Array.from(tbody.querySelectorAll('tr'));
+        const rowsBaru=[];
+        for(const tr of trs){
+            const produk=(tr.querySelector('.pum-ap-produk').value||'').trim();
+            const qty=parseAngka(tr.querySelector('.pum-ap-qty').value);
+            if(!produk && qty===0) continue;
+            if(!produk){ showToast('⚠️ Nama produk wajib diisi untuk baris yang sudah ada Qty-nya.','warning'); return; }
+            if(qty<=0){ showToast('⚠️ Qty harus lebih dari 0 untuk produk "'+produk+'".','warning'); return; }
+            const satuan=(tr.querySelector('.pum-ap-satuan').value||'').trim();
+            const hargaJual=parseAngka(tr.querySelector('.pum-ap-hargajual').value);
+            const hargaBeliStr=(tr.querySelector('.pum-ap-hargabeli').value||'').trim();
+            const hargaBeli=hargaBeliStr===''?'':parseAngka(hargaBeliStr);
+            const disc=parseAngka(tr.querySelector('.pum-ap-disc').value);
+            const total=Math.max(0,(qty*hargaJual)-disc);
+            const profit=hargaBeli===''?'':(total-(hargaBeli*qty));
+            rowsBaru.push({
+                'Tanggal': toDateKey(ctx.tglFaktur)||new Date().toISOString().slice(0,10),
+                'No.Faktur': ctx.noFaktur,
+                'Produk': produk,
+                'Jumlah': qty,
+                'Satuan': satuan,
+                'Harga Jual': hargaJual,
+                'Disc': disc,
+                'Total': total,
+                'Sales': (ctx.sales && ctx.sales!=='-') ? ctx.sales : 'LAINNYA',
+                'Customer': ctx.namaToko||'',
+                'Alamat': ctx.alamat||'',
+                'Pembayaran': ctx.source==='cash'?'Cash':'Tempo',
+                'Harga Beli': hargaBeli,
+                'Profit': profit
+            });
+        }
+        if(rowsBaru.length===0){ showToast('⚠️ Isi minimal 1 baris produk (Nama Produk & Qty wajib diisi).','warning'); return; }
+        salesData.push(...rowsBaru);
+        const okSave=await saveSalesData();
+        if(!okSave) return;
+        if(typeof rebuildSalesFilterOptions==='function') rebuildSalesFilterOptions();
+        if(typeof refreshPiutangUangMasuk==='function') refreshPiutangUangMasuk();
+        if(typeof ptRebuildFilterOptions==='function') ptRebuildFilterOptions();
+        if(typeof ptRenderTempoTable==='function') ptRenderTempoTable();
+        const newId=pumFindIdAfterRefresh(ctx.source, ctx.noFaktur, ctx.tglFaktur, ctx.namaToko);
+        if(newId!=null){ openPumDetail(newId, ctx.source); }
+        showToast('✅ '+rowsBaru.length+' baris produk tersimpan ke Bank Data Penjualan. Profit sudah dihitung ulang.','success');
+    }
+    document.addEventListener('click', function(e){
+        if(e.target && e.target.id==='pumAddProdukBtnTambahBaris'){
+            const tbody=document.getElementById('pumAddProdukTbody');
+            if(tbody) tbody.insertAdjacentHTML('beforeend', pumAddProdukRowHtml());
+            return;
+        }
+        const hapusBtn=e.target.closest && e.target.closest('.pum-ap-hapus');
+        if(hapusBtn){
+            const tbody=document.getElementById('pumAddProdukTbody');
+            const tr=hapusBtn.closest('tr');
+            if(tbody && tr && tbody.children.length>1){ tr.remove(); }
+            else if(tr){ tr.querySelectorAll('input').forEach(inp=>inp.value=''); const t=tr.querySelector('.pum-ap-total'); if(t) t.textContent='Rp 0'; }
+            return;
+        }
+        if(e.target && e.target.id==='pumAddProdukBtnSimpan'){
+            pumSimpanTambahProduk();
+            return;
+        }
+    });
+    document.addEventListener('input', function(e){
+        if(e.target.matches && e.target.matches('#pumAddProdukTable .pum-ap-qty, #pumAddProdukTable .pum-ap-hargajual, #pumAddProdukTable .pum-ap-disc')){
+            const tr=e.target.closest('tr'); if(tr) pumRecalcRowTotal(tr);
+        }
+        if(e.target.matches && e.target.matches('#pumAddProdukTable .pum-ap-produk')){
+            const tr=e.target.closest('tr'); if(!tr) return;
+            const nama=e.target.value.trim();
+            if(nama.length<2) return;
+            const master=typeof cariHargaProdukMaster==='function'?cariHargaProdukMaster(nama):null;
+            if(master){
+                const hjInput=tr.querySelector('.pum-ap-hargajual');
+                const hbInput=tr.querySelector('.pum-ap-hargabeli');
+                const qtyInput=tr.querySelector('.pum-ap-qty');
+                if(hjInput && !hjInput.value && master.hargaJual!=='') hjInput.value=formatAngka(master.hargaJual);
+                if(hbInput && !hbInput.value && master.hargaBeli!=='') hbInput.value=formatAngka(master.hargaBeli);
+                if(qtyInput && !qtyInput.value) qtyInput.value='1';
+                pumRecalcRowTotal(tr);
+            }
+        }
+    });
     document.getElementById('pumDetailClose').addEventListener('click', ()=>{ document.getElementById('pumDetailModal').classList.remove('show'); });
     document.getElementById('pumDetailModal').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('show'); });
 
