@@ -17,6 +17,17 @@ const SYNC_CONFIG = {
   enableRealtime: true             // enable real-time listeners
 };
 
+// ─── SHARED SUPABASE CLIENT (satu instance dipakai bareng) ───
+// index.html pakai ini untuk Auth (login/logout/session).
+// dashboard-kerja.html (lewat SupabaseTable) pakai ini untuk baca/tulis data.
+// Karena keduanya pakai project & key yang sama, session login yang
+// tersimpan di localStorage otomatis "kebaca" oleh instance ini di semua
+// halaman — tidak perlu oper token manual antar halaman.
+const supabaseApp = (typeof window !== 'undefined' && window.supabase && window.supabase.createClient)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+if (typeof window !== 'undefined') window.supabaseApp = supabaseApp;
+
 // ─── STORAGE KEYS ───
 const STORAGE_KEYS = {
   PENDING_OPS: 'gm2026_pendingOps',      // operasi offline

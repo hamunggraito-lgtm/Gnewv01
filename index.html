@@ -648,8 +648,10 @@
     });
 
     // ─── SUPABASE AUTH CLIENT (resmi) ───
-    // SUPABASE_URL & SUPABASE_KEY sudah dideklarasikan di supabase-client.js
-    const supabaseAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Pakai instance yang SAMA dengan supabase-client.js (window.supabaseApp),
+    // supaya sesi login yang dibuat di sini otomatis kebaca oleh halaman lain
+    // (mis. dashboard-kerja.html) tanpa perlu oper token manual.
+    const supabaseAuth = window.supabaseApp;
 
     // ─── AUTH HANDLERS ───
     function showLoginOverlay(message) {

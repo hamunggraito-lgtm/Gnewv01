@@ -5128,6 +5128,12 @@
 
     <div class="toast success" id="toastGlobal">🔄 Data dimuat.</div>
 
+    <!-- SUPABASE AUTH SDK (resmi) — dipakai utk ambil sesi login yang sudah
+         dibuat di index.html (session sama, tersimpan di localStorage) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <!-- HYBRID SYNC ENGINE — deklarasi SUPABASE_URL/KEY + window.supabaseApp -->
+    <script src="supabase-client.js"></script>
+
     <script>
         // ================================================================
         // UTILITY
@@ -5607,15 +5613,182 @@
         }
 
         // ================================================================
-        // VERSI NETRAL: tidak memakai server/backend apapun (Firebase sudah
-        // dihapus total). Semua data disimpan MURNI di IndexedDB lokal milik
-        // browser lewat LocalTable di atas. buatDb(false) di bawah akan selalu
-        // memakai LocalTable untuk semua tabel.
+        // SUPABASE TABLE — pengganti LocalTable KHUSUS untuk tabel `sales`
+        // dan `cashIncome` (pilot 2 modul dulu). Bentuk method-nya SENGAJA
+        // dibuat SAMA PERSIS seperti LocalTable (add, bulkAdd, toArray,
+        // count, clear, delete, update, where().equals().first(), syncRows)
+        // supaya seluruh kode aplikasi di bawah ini (yang memanggil
+        // db.sales.xxx / db.cashIncome.xxx) TIDAK PERLU diubah satu-persatu.
+        //
+        // Struktur tabel di Supabase (lihat SQL editor):
+        //   id uuid primary key, data jsonb, updated_at timestamptz, deleted boolean
+        // Objek bisnis yang dipakai kode aplikasi (mis. { bulan, data, tanggal })
+        // disimpan APA ADANYA di kolom `data` (jsonb), sedangkan `id` selalu
+        // ada di level atas (di luar `data`) — persis seperti hasil
+        // LocalTable di atas.
+        //
+        // CATATAN PENTING: tabel ini butuh RLS policy di Supabase yang
+        // mengizinkan user yang SUDAH LOGIN (authenticated) untuk
+        // select/insert/update pada tabel `sales` & `cash_income`. Kalau
+        // belum diset, semua panggilan di bawah akan gagal dengan error
+        // permission/RLS dari Supabase.
+        // ================================================================
+        class SupabaseTable {
+            constructor(tableName) {
+                this.table = tableName; // nama tabel ASLI di Supabase (mis. 'cash_income')
+            }
+            get client() {
+                if (!window.supabaseApp) throw new Error('Supabase client belum siap (supabase-client.js belum termuat)');
+                return window.supabaseApp;
+            }
+            _buatId() {
+                return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                    'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+            }
+            _unwrap(row) {
+                // Gabungkan isi kolom `data` (jsonb) + `id` di level atas,
+                // supaya bentuknya identik dengan row hasil LocalTable.
+                return Object.assign({}, row.data, { id: row.id });
+            }
+            async add(obj) {
+                const { id, ...rest } = obj || {};
+                const newId = this._buatId();
+                const { error } = await this.client.from(this.table).insert({ id: newId, data: rest });
+                if (error) throw error;
+                return newId;
+            }
+            async bulkAdd(arr) {
+                if (!arr || arr.length === 0) return;
+                const rows = arr.map(o => {
+                    const { id, ...rest } = o || {};
+                    return { id: this._buatId(), data: rest };
+                });
+                const CHUNK = 500; // batasi ukuran per request, mirip semangat syncRows di LocalTable
+                for (let i = 0; i < rows.length; i += CHUNK) {
+                    const { error } = await this.client.from(this.table).insert(rows.slice(i, i + CHUNK));
+                    if (error) throw error;
+                }
+            }
+            async toArray() {
+                const { data, error } = await this.client
+                    .from(this.table)
+                    .select('id,data,updated_at')
+                    .or('deleted.is.null,deleted.eq.false');
+                if (error) throw error;
+                return (data || []).map(row => this._unwrap(row));
+            }
+            async count() {
+                const { count, error } = await this.client
+                    .from(this.table)
+                    .select('id', { count: 'exact', head: true })
+                    .or('deleted.is.null,deleted.eq.false');
+                if (error) throw error;
+                return count || 0;
+            }
+            async clear() {
+                // Dipakai saat restore-dari-backup (hapus semua baris, akan
+                // ditulis ulang lewat bulkAdd setelah ini). Filter 'not id is null'
+                // dipakai karena PostgREST mewajibkan filter pada DELETE.
+                const { error } = await this.client.from(this.table).delete().not('id', 'is', null);
+                if (error) throw error;
+            }
+            async delete(id) {
+                // Soft-delete (tandai deleted=true) supaya konsisten dengan
+                // kolom `deleted` yang sudah ada di skema tabel ini.
+                const { error } = await this.client.from(this.table).update({ deleted: true }).eq('id', id);
+                if (error) throw error;
+            }
+            async update(id, changes) {
+                const { data: existing, error: e1 } = await this.client
+                    .from(this.table).select('data').eq('id', id).single();
+                if (e1) throw e1;
+                const { id: _ignored, ...changesRest } = changes || {};
+                const merged = Object.assign({}, existing ? existing.data : {}, changesRest);
+                const { error } = await this.client.from(this.table).update({ data: merged }).eq('id', id);
+                if (error) throw error;
+            }
+            where(field) {
+                return {
+                    equals: (value) => ({
+                        first: async () => {
+                            const all = await this.toArray();
+                            return all.find(row => row[field] === value);
+                        }
+                    })
+                };
+            }
+            // Versi Supabase dari syncRows (lihat LocalTable.syncRows untuk
+            // penjelasan pola "hanya tulis yang berubah"). Dipakai oleh
+            // saveSalesData() supaya simpan sales tetap incremental, bukan
+            // hapus-semua-lalu-tulis-ulang.
+            async syncRows(currentRows, docIdMap, snapshotMap) {
+                const stillPresentIds = new Set();
+                const toAdd = [], toUpdate = [], toDeleteIds = [];
+
+                currentRows.forEach(row => {
+                    const id = docIdMap.get(row);
+                    if (!id) {
+                        toAdd.push(row);
+                    } else {
+                        stillPresentIds.add(id);
+                        const prevJSON = snapshotMap.get(id);
+                        const curJSON = JSON.stringify(row);
+                        if (prevJSON !== curJSON) toUpdate.push({ id, row });
+                    }
+                });
+                snapshotMap.forEach((_, id) => { if (!stillPresentIds.has(id)) toDeleteIds.push(id); });
+
+                const CHUNK = 500;
+
+                if (toAdd.length) {
+                    const withIds = toAdd.map(row => ({ id: this._buatId(), row }));
+                    for (let i = 0; i < withIds.length; i += CHUNK) {
+                        const chunk = withIds.slice(i, i + CHUNK);
+                        const { error } = await this.client.from(this.table)
+                            .insert(chunk.map(({ id, row }) => ({ id, data: row })));
+                        if (error) throw error;
+                        chunk.forEach(({ id, row }) => {
+                            docIdMap.set(row, id);
+                            snapshotMap.set(id, JSON.stringify(row));
+                        });
+                    }
+                }
+
+                for (const { id, row } of toUpdate) {
+                    const { error } = await this.client.from(this.table).update({ data: row }).eq('id', id);
+                    if (error) throw error;
+                    snapshotMap.set(id, JSON.stringify(row));
+                }
+
+                if (toDeleteIds.length) {
+                    for (let i = 0; i < toDeleteIds.length; i += CHUNK) {
+                        const chunk = toDeleteIds.slice(i, i + CHUNK);
+                        const { error } = await this.client.from(this.table).update({ deleted: true }).in('id', chunk);
+                        if (error) throw error;
+                    }
+                    toDeleteIds.forEach(id => snapshotMap.delete(id));
+                }
+
+                return { added: toAdd.length, updated: toUpdate.length, deleted: toDeleteIds.length };
+            }
+        }
+
+        // ================================================================
+        // PILOT SUPABASE: tabel `sales` & `cashIncome` sekarang pakai
+        // SupabaseTable (data server, sinkron semua perangkat). Sisanya
+        // (printHistory, trash, piutangNotes, dst) TETAP LocalTable
+        // (IndexedDB lokal) dulu, belum dipindah.
         // ================================================================
         let fsdb = null;
         let firestoreSiap = false;
 
         const NAMA_TABEL = ['sales', 'cashIncome', 'printHistory', 'trash', 'piutangNotes', 'cashNotes', 'cetakTagihanMap', 'inputHarian', 'pengeluaran'];
+
+        // Pemetaan nama store di kode (camelCase) -> nama tabel asli di Supabase (snake_case)
+        const SUPABASE_TABEL_MAP = {
+            sales: 'sales',
+            cashIncome: 'cash_income'
+        };
 
         function buatDb(gunakanFirestore) {
             const obj = {
@@ -5623,15 +5796,17 @@
                 transaction: async function(mode, table, fn) { return await fn(); }
             };
             NAMA_TABEL.forEach(nama => {
-                obj[nama] = gunakanFirestore ? new FirestoreTable(nama) : new LocalTable(nama);
+                if (SUPABASE_TABEL_MAP[nama]) {
+                    obj[nama] = new SupabaseTable(SUPABASE_TABEL_MAP[nama]);
+                } else {
+                    obj[nama] = gunakanFirestore ? new FirestoreTable(nama) : new LocalTable(nama);
+                }
             });
             return obj;
         }
 
         const db = buatDb(firestoreSiap);
-        if (!firestoreSiap) {
-            console.warn('Memakai penyimpanan LOKAL (IndexedDB) karena Firestore gagal disiapkan. Data TIDAK akan sinkron ke perangkat lain sampai ini diperbaiki.');
-        }
+        console.info('📡 sales & cashIncome memakai Supabase (server). Modul lain masih LOKAL (IndexedDB).');
 
         // --------------------------------------------------------------
         // Indikator status koneksi ke server (Firestore), supaya jelas
@@ -13573,11 +13748,32 @@
         }
 
         // ================================================================
-        // AUTH BOOTSTRAP — dinonaktifkan (hosting statis GitHub Pages tidak
-        // punya server backend untuk /api/auth/..., jadi langsung buka app).
+        // AUTH BOOTSTRAP — sales & cashIncome sekarang di server (Supabase),
+        // jadi halaman ini WAJIB ada sesi login yang valid (sama seperti
+        // sesi yang dibuat di index.html). Kalau tidak ada sesi, lempar
+        // balik ke index.html supaya user login dulu di sana.
         // ================================================================
         (async function bootstrap() {
-            startApp();
+            try {
+                if (!window.supabaseApp) {
+                    console.error('❌ Supabase client belum siap, cek koneksi ke cdn.jsdelivr.net / supabase-client.js');
+                    startApp(); // tetap coba buka (modul selain sales/cashIncome tetap jalan lokal)
+                    return;
+                }
+                const { data: { session } } = await window.supabaseApp.auth.getSession();
+                if (!session || !session.user) {
+                    location.href = 'index.html';
+                    return;
+                }
+                // Pantau kalau sesi berakhir (logout dari tab lain, token expired, dll)
+                window.supabaseApp.auth.onAuthStateChange((event) => {
+                    if (event === 'SIGNED_OUT') location.href = 'index.html';
+                });
+                startApp();
+            } catch (e) {
+                console.error('Gagal cek sesi login:', e);
+                startApp();
+            }
         })();
 
         // ================================================================
@@ -13586,9 +13782,9 @@
         async function handleLogoutClick() {
             if (!confirm('Yakin mau logout dari GAMAS 2026?')) return;
             try {
-                await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-            } catch (e) { /* tetap lanjut reload walau request gagal, biar UI konsisten */ }
-            location.reload();
+                if (window.supabaseApp) await window.supabaseApp.auth.signOut();
+            } catch (e) { /* tetap lanjut ke index.html walau request gagal */ }
+            location.href = 'index.html';
         }
         document.getElementById('btnLogoutHeader').addEventListener('click', handleLogoutClick);
         const btnLogoutFloatEl = document.getElementById('btnLogoutFloat');
