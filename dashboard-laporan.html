@@ -172,6 +172,7 @@
         .pt-card-item { background:#fff; border:1px solid #e2e8f0; border-left:4px solid #667eea; border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:5px; cursor:pointer; transition:all 0.15s ease; }
         .pt-card-item:hover { box-shadow:0 4px 14px rgba(102,126,234,0.2); transform:translateY(-2px); }
         .pt-card-item.pt-card-overdue { border-left-color:#dc2626; }
+        .pt-card-item.pt-card-profit-missing { background:#fef2f2; border-color:#fecaca; border-left-color:#ef4444; }
         .pt-card-top { display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:2px; }
         .pt-card-top .faktur-link { font-size:11px; }
         .pt-card-row { display:flex; justify-content:space-between; gap:8px; font-size:10px; color:#64748b; }
@@ -2965,7 +2966,7 @@
     document.getElementById('pumSumProfitNote').addEventListener('click', function(e){
         if(e.target.closest('#pumProfitMissingLink')) bukaModalProfitMissingPiutang();
     });
-    let piutangUangMasukViewMode = localStorage.getItem('pumViewMode')==='card'?'card':'table';
+    let piutangUangMasukViewMode = localStorage.getItem('pumViewMode')==='table'?'table':'card';
     function pumApplyViewModeUI() {
         const tableWrap=document.getElementById('piutangUangMasukTableWrap');
         const cardList=document.getElementById('piutangUangMasukCardList');
@@ -2979,8 +2980,9 @@
         cardList.innerHTML=pageRows.map(d=>{
             const items=(Array.isArray(d.profitItems)&&d.profitItems.length>0)?d.profitItems:[{produk:d.produk||'-',qty:'',satuan:''}];
             const produkListHtml=items.map(it=>`<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dashed #e2e8f0;"><span>${escapeHtml(it.produk||'-')}</span><span style="white-space:nowrap;color:#475569;">${it.qty!==''&&it.qty!=null?it.qty:''} ${it.satuan||''}</span></div>`).join('');
+            const profitMissing=(d.profit===''||d.profit==null);
             return `
-            <div class="pt-card-item ${d.statusClass==='overdue'?'pt-card-overdue':''}" onclick="openPumDetail(${d._id})">
+            <div class="pt-card-item ${d.statusClass==='overdue'?'pt-card-overdue':''} ${profitMissing?'pt-card-profit-missing':''}" onclick="openPumDetail(${d._id})">
                 <div class="pt-card-top">
                     <span class="faktur-link">${d.noFaktur||'-'}</span>
                     ${pumStatusBadgeHtml(d)}
@@ -3327,7 +3329,7 @@
         noteEl.style.display=countProfitMissing>0?'block':'none';
         noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
     }
-    let cashDroppingUangMasukViewMode = localStorage.getItem('cddViewMode')==='card'?'card':'table';
+    let cashDroppingUangMasukViewMode = localStorage.getItem('cddViewMode')==='table'?'table':'card';
     function cddApplyViewModeUI() {
         const tableWrap=document.getElementById('cashDroppingUangMasukTableWrap');
         const cardList=document.getElementById('cashDroppingUangMasukCardList');
@@ -3338,8 +3340,10 @@
     function cddRenderCardList(pageRows) {
         const cardList=document.getElementById('cashDroppingUangMasukCardList');
         if(pageRows.length===0){ cardList.innerHTML='<div class="empty-msg">📂 Tidak ada data cash dropping dari Data Uang Masuk.</div>'; return; }
-        cardList.innerHTML=pageRows.map(d=>`
-            <div class="pt-card-item" onclick="openPumDetail(${d._id},'cash')">
+        cardList.innerHTML=pageRows.map(d=>{
+            const profitMissing=(d.profit===''||d.profit==null);
+            return `
+            <div class="pt-card-item ${profitMissing?'pt-card-profit-missing':''}" onclick="openPumDetail(${d._id},'cash')">
                 <div class="pt-card-top">
                     <span class="faktur-link">${d.noFaktur||'-'}</span>
                     <span class="badge pt-tercatat">Cash</span>
@@ -3353,7 +3357,8 @@
                 <div class="pt-card-row"><span>Tgl Bayar</span><span>${d.tglBayar||'-'}</span></div>
                 <div class="pt-card-row highlight"><span>Profit</span><span>${pumProfitCellHtml(d)}</span></div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
     document.getElementById('cashDroppingUangMasukViewToggle').addEventListener('click', function(){
         cashDroppingUangMasukViewMode = cashDroppingUangMasukViewMode==='card'?'table':'card';
