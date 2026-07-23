@@ -4162,7 +4162,13 @@
 
     <!-- ======= TAB 4 – CEK PIUTANG ======= -->
     <div class="tab-content" id="tab4">
-        <div class="tab1-app-toolbar" style="justify-content:flex-end;">
+        <div class="tab1-app-toolbar">
+            <div class="tab1-chip-row" id="tab4ChipRow">
+                <button type="button" class="tab1-chip active" data-chip="semua">Semua <span class="chip-count" id="tab4ChipCountSemua">0</span></button>
+                <button type="button" class="tab1-chip" data-chip="lunas">✅ Lunas <span class="chip-count" id="tab4ChipCountLunas">0</span></button>
+                <button type="button" class="tab1-chip" data-chip="belum_lunas">❌ Belum Lunas <span class="chip-count" id="tab4ChipCountBelumLunas">0</span></button>
+                <button type="button" class="tab1-chip" data-chip="titip">🟠 Titip <span class="chip-count" id="tab4ChipCountTitip">0</span></button>
+            </div>
             <div class="tab1-view-toggle" id="tab4ViewToggle">
                 <button type="button" class="tab1-view-btn active" id="tab4ViewTabelBtn" data-view="table">📋 Tabel</button>
                 <button type="button" class="tab1-view-btn" id="tab4ViewKartuBtn" data-view="card">🗂️ Kartu</button>
@@ -8033,6 +8039,12 @@
         }
 
         let salesAnomaliBannerTimer = null;
+        const SALES_ANOMALI_BANNER_DURATION = 60000; // 60 detik — sebelumnya 15dtk terlalu cepat untuk sempat dibaca/diklik
+        function startSalesAnomaliBannerTimer() {
+            if (salesAnomaliBannerTimer) { clearTimeout(salesAnomaliBannerTimer); salesAnomaliBannerTimer = null; }
+            const banner = document.getElementById('salesAnomaliBanner');
+            salesAnomaliBannerTimer = setTimeout(() => { banner.classList.remove('show'); }, SALES_ANOMALI_BANNER_DURATION);
+        }
         function checkAndShowSalesAnomaliBanner() {
             const banner = document.getElementById('salesAnomaliBanner');
             const msgEl = document.getElementById('salesAnomaliBannerMsg');
@@ -8043,8 +8055,16 @@
             if (!msg) { banner.classList.remove('show'); return; }
             msgEl.textContent = msg;
             banner.classList.add('show');
-            salesAnomaliBannerTimer = setTimeout(() => { banner.classList.remove('show'); }, 15000);
+            startSalesAnomaliBannerTimer();
         }
+        // Jeda hitung mundur selama mouse berada di atas banner (mis. lagi dibaca), supaya
+        // tidak tiba-tiba hilang saat masih ingin dibaca/diklik; lanjut lagi 60dtk saat mouse keluar.
+        document.getElementById('salesAnomaliBanner').addEventListener('mouseenter', function() {
+            if (salesAnomaliBannerTimer) { clearTimeout(salesAnomaliBannerTimer); salesAnomaliBannerTimer = null; }
+        });
+        document.getElementById('salesAnomaliBanner').addEventListener('mouseleave', function() {
+            if (this.classList.contains('show')) startSalesAnomaliBannerTimer();
+        });
 
         document.getElementById('salesAnomaliBannerClose').addEventListener('click', function() {
             document.getElementById('salesAnomaliBanner').classList.remove('show');
@@ -9116,14 +9136,14 @@
             }
         }
 
-        function ptGetFilteredTempo() {
+        function ptGetFilteredTempo(ignoreStatus) {
             const search = document.getElementById('ptSearch').value.trim().toLowerCase();
             const tanggalEl = document.getElementById('ptTanggal');
             const tanggal = tanggalEl ? tanggalEl.value : '';
             const bulan = document.getElementById('ptBulan').value;
             const sales = document.getElementById('ptSales').value;
             const kategori = document.getElementById('ptKategori').value;
-            const status = document.getElementById('ptStatus').value;
+            const status = ignoreStatus ? '' : document.getElementById('ptStatus').value;
             
             return ptBuildTempoRows().filter(r => {
                 // SEARCH FILTER: Bypass bulan filter jika ada search (cari di semua periode)
@@ -9204,9 +9224,41 @@
             const outstanding = rows.filter(r => r.statusClass !== 'lunas').length;
             document.getElementById('badgePiutang').textContent = outstanding;
 
+            updateTab4ChipCounts();
             renderPiutangCards(pageRows, start);
             updatePiutangSelectedInfo();
         }
+
+        // Chip Semua/Lunas/Belum Lunas/Titip (tab Cek Piutang) — dihitung dari rows yang sudah
+        // kena filter lain (search/tanggal/bulan/sales/kategori) TAPI TANPA filter Status, supaya
+        // angkanya tetap menunjukkan total apa adanya persis seperti chip di tab Cek Cash.
+        function updateTab4ChipCounts() {
+            const rowsAllStatus = ptGetFilteredTempo(true);
+            const cLunas = rowsAllStatus.filter(r => r.statusClass === 'lunas').length;
+            const cBelumLunas = rowsAllStatus.filter(r => r.statusClass !== 'lunas').length;
+            const cTitip = rowsAllStatus.filter(r => (r.ketRaw || '').toLowerCase().includes('titip')).length;
+            const setChipTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            setChipTxt('tab4ChipCountSemua', rowsAllStatus.length);
+            setChipTxt('tab4ChipCountLunas', cLunas);
+            setChipTxt('tab4ChipCountBelumLunas', cBelumLunas);
+            setChipTxt('tab4ChipCountTitip', cTitip);
+            const statusVal = document.getElementById('ptStatus').value;
+            const activeChip = statusVal === 'lunas' ? 'lunas' : (statusVal === 'belum_gabungan' ? 'belum_lunas' : (statusVal === 'titip' ? 'titip' : 'semua'));
+            document.querySelectorAll('#tab4ChipRow .tab1-chip').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.chip === activeChip);
+            });
+        }
+        document.getElementById('tab4ChipRow').addEventListener('click', function(e) {
+            const btn = e.target.closest('.tab1-chip');
+            if (!btn) return;
+            const chip = btn.dataset.chip; // semua | lunas | belum_lunas | titip
+            const statusSel = document.getElementById('ptStatus');
+            if (statusSel) {
+                statusSel.value = chip === 'lunas' ? 'lunas' : (chip === 'belum_lunas' ? 'belum_gabungan' : (chip === 'titip' ? 'titip' : ''));
+            }
+            ptPage = 1;
+            ptRenderTempoTable();
+        });
 
         function updatePiutangSelectedInfo() {
             const selectedCount = Object.values(ptChecked).filter(v => v).length;

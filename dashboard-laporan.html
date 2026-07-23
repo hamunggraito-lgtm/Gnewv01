@@ -1417,7 +1417,7 @@
     let rawCashDrop = [];
     let cekFilterFaktur='', cekFilterTanggal='', cekFilterSales='', cekFilterBulan='', cekFilterKategori='', cekFilterKet='';
     let APP_DEFAULT_BULAN = '';
-    let userSetBulan = { sales:false, cek:false, pt:false };
+    let userSetBulan = { sales:false, cek:false, pt:false, pum:false, cdd:false };
     const filterCache = new Map();
     const CACHE_MAX=50;
     let ptPage=1; const ptRowsPerPage=25;
@@ -2668,6 +2668,7 @@
     // TAB 9 & 10 – PIUTANG TEMPO & CASH DROPPING dari Data Uang Masuk
     // ================================================================
     let piutangUangMasukData=[];
+    let pumProfitMissingList=[]; // daftar faktur yg profit-nya belum bisa dihitung (untuk modal klik di card Total Profit Real)
     let cashDroppingUangMasukData=[];
     let piutangUangMasukPage=1;
     let cashDroppingUangMasukPage=1;
@@ -2765,7 +2766,7 @@
                     let overdueDays=null;
                     if(statusClass!=='lunas' && d.jt){ const jtDate=ptParseDMY(d.jt); if(jtDate && jtDate<todayPtUM){ statusClass='overdue'; overdueDays=ptDaysBetween(todayPtUM,jtDate); } }
                     let tglBayar='';
-                    if(statusClass==='lunas' && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayar=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
+                    if(totalBayar>0 && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayar=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
                     // Profit dihitung PROPORSIONAL sesuai porsi yang sudah dibayar (model konsinyasi/titip):
                     // - Barang yang belum dibayar dianggap masih brg/stok di toko (bukan kerugian).
                     // - Modal yang "dikorbankan" hanya untuk porsi yang sudah terbayar.
@@ -2797,7 +2798,7 @@
                     const sisaModalTertahanCdd=modalAdaCdd?(modalTotalCdd-modalProporsionalCdd):'';
                     const sisaTagihanCdd=Math.max(0,tagihanCdd-totalBayarCdd);
                     let tglBayarCdd='';
-                    if(sisaTagihanCdd<=0.5 && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayarCdd=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
+                    if(totalBayarCdd>0 && day.tanggal){ const dayPart=String(day.tanggal).split('-')[0]; const [tahun,bulanNum]=bulan.split('-'); if(dayPart) tglBayarCdd=`${dayPart.padStart(2,'0')}/${bulanNum}/${tahun}`; }
                     const estimasiProfitSisaCdd=modalAdaCdd?(sisaTagihanCdd-sisaModalTertahanCdd):'';
                     cashDroppingUangMasukData.push({...d,sales:salesNama,tglFaktur:d.tglFaktur||day.tanggal,kategori:isFitri?'fitri':'rupa',produk:produkGabungan,tagihan:tagihanCdd,totalBayar:totalBayarCdd,sisaTagihan:sisaTagihanCdd,tglBayar:tglBayarCdd,modalTotal:modalTotalCdd,modalAda:modalAdaCdd,proporsiBayar:proporsiBayarCdd,modalProporsional:modalProporsionalCdd,profit:profitCdd,profitKotorTotal:profitKotorTotalCdd,sisaModalTertahan:sisaModalTertahanCdd,estimasiProfitSisa:estimasiProfitSisaCdd,profitItems:salesMatch?salesMatch.items:[],_bulan:bulan,_tanggalHari:day.tanggal,_id:cashDroppingUangMasukData.length});
                 });
@@ -2813,20 +2814,29 @@
             }
             return 0;
         }
-        function pumSortTglBayar(d){
-            const parsed=ptParseDMY(d.tglBayar);
-            return parsed?parsed.getTime():0;
-        }
         piutangUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
         cashDroppingUangMasukData.sort((a,b)=>pumSortDate(a)-pumSortDate(b));
     }
 
     function updateUangMasukFilterOptions() {
+        // Pilih nilai Bulan default: pertahankan pilihan user kalau masih valid; kalau user belum pernah
+        // mengubah filter Bulan secara manual, pakai bulan default aplikasi (Juli) kalau datanya ada,
+        // atau bulan TERAKHIR yang tersedia di data sebagai fallback — supaya card ringkasan saat tab
+        // pertama dibuka langsung menunjukkan info bulan terakhir, bukan "Semua Periode Ditampilkan".
+        function pilihBulanDefault(bulanSet, curBulan, sudahDiubahUser) {
+            if(curBulan && bulanSet.has(curBulan)) return curBulan;
+            if(!sudahDiubahUser){
+                if(APP_DEFAULT_BULAN && bulanSet.has(APP_DEFAULT_BULAN)) return APP_DEFAULT_BULAN;
+                const sorted=Array.from(bulanSet).sort();
+                if(sorted.length) return sorted[sorted.length-1];
+            }
+            return '';
+        }
         const piutangBulanSet=new Set(); piutangUangMasukData.forEach(d=>{ if(d._bulan) piutangBulanSet.add(d._bulan); });
         const piutangSalesSet=new Set(); piutangUangMasukData.forEach(d=>{ if(d.sales && !/^\d+$/.test(d.sales.trim())) piutangSalesSet.add(d.sales); });
         const bulanSelect=document.getElementById('piutangUangMasukBulan'); const curBulan=bulanSelect.value;
         bulanSelect.innerHTML='<option value="">Semua</option>'+Array.from(piutangBulanSet).sort().map(k=>`<option value="${k}">${fmtBulanTahun(k)}</option>`).join('');
-        if(curBulan&&piutangBulanSet.has(curBulan)) bulanSelect.value=curBulan; else bulanSelect.value='';
+        bulanSelect.value=pilihBulanDefault(piutangBulanSet, curBulan, userSetBulan.pum);
         const salesSelect=document.getElementById('piutangUangMasukSales'); const curSales=salesSelect.value;
         salesSelect.innerHTML='<option value="">Semua</option>'+Array.from(piutangSalesSet).sort().map(s=>`<option value="${s}">${s}</option>`).join('');
         if(curSales&&piutangSalesSet.has(curSales)) salesSelect.value=curSales; else salesSelect.value='';
@@ -2835,12 +2845,19 @@
         const cashSalesSet=new Set(); cashDroppingUangMasukData.forEach(d=>{ if(d.sales && !/^\d+$/.test(d.sales.trim())) cashSalesSet.add(d.sales); });
         const cashBulanSelect=document.getElementById('cashDroppingUangMasukBulan'); const curCashBulan=cashBulanSelect.value;
         cashBulanSelect.innerHTML='<option value="">Semua</option>'+Array.from(cashBulanSet).sort().map(k=>`<option value="${k}">${fmtBulanTahun(k)}</option>`).join('');
-        if(curCashBulan&&cashBulanSet.has(curCashBulan)) cashBulanSelect.value=curCashBulan; else cashBulanSelect.value='';
+        cashBulanSelect.value=pilihBulanDefault(cashBulanSet, curCashBulan, userSetBulan.cdd);
         const cashSalesSelect=document.getElementById('cashDroppingUangMasukSales'); const curCashSales=cashSalesSelect.value;
         cashSalesSelect.innerHTML='<option value="">Semua</option>'+Array.from(cashSalesSet).sort().map(s=>`<option value="${s}">${s}</option>`).join('');
         if(curCashSales&&cashSalesSet.has(curCashSales)) cashSalesSelect.value=curCashSales; else cashSalesSelect.value='';
     }
 
+    // Dipindah ke scope global (sebelumnya terjebak di dalam loadPiutangUangMasukFromCashData sehingga
+    // tidak terjangkau dari sini) — inilah sebab filter Status "Sudah Lunas" sebelumnya gagal diterapkan
+    // (JS error saat sorting, membuat render berhenti di tengah jalan dan tabel tetap menampilkan data lama).
+    function pumSortTglBayar(d){
+        const parsed=ptParseDMY(d.tglBayar);
+        return parsed?parsed.getTime():0;
+    }
     function getFilteredPiutangUangMasuk() {
         const search=document.getElementById('piutangUangMasukSearch').value.trim().toLowerCase();
         const tanggal=document.getElementById('piutangUangMasukTanggal').value;
@@ -2896,11 +2913,12 @@
     }
     function pumRenderSummaryCards(filtered) {
         let totalTagihan=0,totalDibayar=0,totalSisa=0,totalProfit=0,countProfitMissing=0;
+        pumProfitMissingList=[];
         filtered.forEach(d=>{
             totalTagihan+=parseNumber(d.tagihan)||0;
             totalDibayar+=parseNumber(d.totalBayar)||0;
             totalSisa+=parseNumber(d.sisaTagihan)||0;
-            if(d.profit!==''&&d.profit!=null){ totalProfit+=clampProfit(d.profit); } else { countProfitMissing++; }
+            if(d.profit!==''&&d.profit!=null){ totalProfit+=clampProfit(d.profit); } else { countProfitMissing++; pumProfitMissingList.push(d); }
         });
         document.getElementById('pumSumPeriode').textContent=pumPeriodLabel();
         document.getElementById('pumSumCountFaktur').textContent=filtered.length+' faktur';
@@ -2911,8 +2929,42 @@
         document.getElementById('pumSumProfit').className='value';
         const noteEl=document.getElementById('pumSumProfitNote');
         noteEl.style.display=countProfitMissing>0?'block':'none';
-        noteEl.textContent=countProfitMissing>0?`* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)`:'';
+        noteEl.innerHTML=countProfitMissing>0?`<span id="pumProfitMissingLink" style="cursor:pointer;text-decoration:underline;" title="Klik untuk lihat daftar fakturnya">* ${countProfitMissing} faktur belum dihitung (Harga Beli belum ada, atau No.Faktur sama dipakai customer lain sehingga tidak bisa dipastikan)</span>`:'';
     }
+    function bukaModalProfitMissingPiutang() {
+        if(!pumProfitMissingList.length){ showToast('✅ Tidak ada faktur yang belum dihitung profitnya saat ini.','success'); return; }
+        const rowsHtml=pumProfitMissingList.map(d=>`<tr>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(d.tglFaktur||'-')}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;"><span class="faktur-link" style="cursor:pointer;" onclick="document.getElementById('detailModalGlobal').classList.remove('show'); openPumDetail(${d._id});">${escapeHtml(d.noFaktur||'-')}</span></td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(d.namaToko||'-')}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;">${escapeHtml(d.sales||'-')}</td>
+                <td style="padding:4px 8px;border:1px solid #e2e8f0;text-align:right;">${fmtRp(d.tagihan)}</td>
+            </tr>`).join('');
+        document.getElementById('detailModalTitleGlobal').textContent=`❓ Faktur Belum Dihitung Profit (${pumProfitMissingList.length})`;
+        document.getElementById('detailModalBodyGlobal').innerHTML=`
+            <p style="margin-bottom:10px;font-size:12px;color:#555;">
+                Faktur di bawah ini belum bisa dihitung Profit Real-nya karena Harga Beli belum ada di Bank Data Penjualan,
+                atau No.Faktur yang sama dipakai oleh customer lain sehingga tidak bisa dipastikan modalnya.
+                Klik No.Faktur untuk lihat detail lengkapnya.
+            </p>
+            <div style="max-height:360px;overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <thead><tr style="background:#f1f5f9;">
+                    <th style="padding:4px 8px;border:1px solid #e2e8f0;">Tgl Transaksi</th>
+                    <th style="padding:4px 8px;border:1px solid #e2e8f0;">No.Faktur</th>
+                    <th style="padding:4px 8px;border:1px solid #e2e8f0;">Customer</th>
+                    <th style="padding:4px 8px;border:1px solid #e2e8f0;">Sales</th>
+                    <th style="padding:4px 8px;border:1px solid #e2e8f0;">Total Tagihan</th>
+                </tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            </div>`;
+        document.getElementById('detailModalGlobal').classList.add('show');
+        setDetailModalStempelLunas(false);
+    }
+    document.getElementById('pumSumProfitNote').addEventListener('click', function(e){
+        if(e.target.closest('#pumProfitMissingLink')) bukaModalProfitMissingPiutang();
+    });
     let piutangUangMasukViewMode = localStorage.getItem('pumViewMode')==='card'?'card':'table';
     function pumApplyViewModeUI() {
         const tableWrap=document.getElementById('piutangUangMasukTableWrap');
@@ -3197,7 +3249,7 @@
     // Event listeners Tab 9
     document.getElementById('piutangUangMasukBtnRefresh').addEventListener('click', function(){ refreshPiutangUangMasuk(); showToast('🔄 Data Piutang Tempo & Cash Dropping dimuat ulang.','success'); });
     document.getElementById('piutangUangMasukBtnReset').addEventListener('click', function(){
-        document.getElementById('piutangUangMasukSearch').value=''; document.getElementById('piutangUangMasukTanggal').value=''; document.getElementById('piutangUangMasukBulan').value=''; document.getElementById('piutangUangMasukSales').value=''; document.getElementById('piutangUangMasukStatus').value=''; piutangUangMasukPage=1; renderPiutangUangMasuk();
+        document.getElementById('piutangUangMasukSearch').value=''; document.getElementById('piutangUangMasukTanggal').value=''; document.getElementById('piutangUangMasukBulan').value=''; userSetBulan.pum=true; document.getElementById('piutangUangMasukSales').value=''; document.getElementById('piutangUangMasukStatus').value=''; piutangUangMasukPage=1; renderPiutangUangMasuk();
     });
     document.getElementById('piutangUangMasukPrevPage').addEventListener('click', function(){ if(piutangUangMasukPage>1){ piutangUangMasukPage--; renderPiutangUangMasuk(); } });
     document.getElementById('piutangUangMasukNextPage').addEventListener('click', function(){ const total=getFilteredPiutangUangMasuk().length; const totalPages=Math.max(1,Math.ceil(total/UANG_MASUK_ROWS_PER_PAGE)); if(piutangUangMasukPage<totalPages){ piutangUangMasukPage++; renderPiutangUangMasuk(); } });
@@ -3205,7 +3257,7 @@
     // Event listeners Tab 10
     document.getElementById('cashDroppingUangMasukBtnRefresh').addEventListener('click', function(){ refreshPiutangUangMasuk(); showToast('🔄 Data Cash Dropping dimuat ulang.','success'); });
     document.getElementById('cashDroppingUangMasukBtnReset').addEventListener('click', function(){
-        document.getElementById('cashDroppingUangMasukSearch').value=''; document.getElementById('cashDroppingUangMasukTanggal').value=''; document.getElementById('cashDroppingUangMasukBulan').value=''; document.getElementById('cashDroppingUangMasukSales').value=''; cashDroppingUangMasukPage=1; renderCashDroppingUangMasuk();
+        document.getElementById('cashDroppingUangMasukSearch').value=''; document.getElementById('cashDroppingUangMasukTanggal').value=''; document.getElementById('cashDroppingUangMasukBulan').value=''; userSetBulan.cdd=true; document.getElementById('cashDroppingUangMasukSales').value=''; cashDroppingUangMasukPage=1; renderCashDroppingUangMasuk();
     });
     document.getElementById('cashDroppingUangMasukPrevPage').addEventListener('click', function(){ if(cashDroppingUangMasukPage>1){ cashDroppingUangMasukPage--; renderCashDroppingUangMasuk(); } });
     document.getElementById('cashDroppingUangMasukNextPage').addEventListener('click', function(){ const total=getFilteredCashDroppingUangMasuk().length; const totalPages=Math.max(1,Math.ceil(total/UANG_MASUK_ROWS_PER_PAGE)); if(cashDroppingUangMasukPage<totalPages){ cashDroppingUangMasukPage++; renderCashDroppingUangMasuk(); } });
@@ -3215,11 +3267,13 @@
     document.getElementById('piutangUangMasukSearch').addEventListener('input', debouncePiutangUangMasuk);
     document.getElementById('piutangUangMasukTanggal').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('piutangUangMasukBulan').addEventListener('change', debouncePiutangUangMasuk);
+    document.getElementById('piutangUangMasukBulan').addEventListener('change', ()=>{ userSetBulan.pum=true; });
     document.getElementById('piutangUangMasukSales').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('piutangUangMasukStatus').addEventListener('change', debouncePiutangUangMasuk);
     document.getElementById('cashDroppingUangMasukSearch').addEventListener('input', debounceCashDroppingUangMasuk);
     document.getElementById('cashDroppingUangMasukTanggal').addEventListener('change', debounceCashDroppingUangMasuk);
     document.getElementById('cashDroppingUangMasukBulan').addEventListener('change', debounceCashDroppingUangMasuk);
+    document.getElementById('cashDroppingUangMasukBulan').addEventListener('change', ()=>{ userSetBulan.cdd=true; });
     document.getElementById('cashDroppingUangMasukSales').addEventListener('change', debounceCashDroppingUangMasuk);
 
     // ================================================================
