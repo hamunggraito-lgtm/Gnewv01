@@ -124,11 +124,6 @@
       gap: 14px;
     }
 
-    /* ── icon di pojok kiri atas dihapus ── */
-    .brand-icon {
-      display: none;
-    }
-
     .brand h1 {
       font-size: 22px;
       font-weight: 800;
@@ -154,6 +149,43 @@
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+
+    /* ── SYNC STATUS INDICATOR ── */
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: rgba(0, 217, 255, 0.05);
+      border: 1px solid rgba(0, 217, 255, 0.1);
+      font-size: 11px;
+      color: rgba(0, 217, 255, 0.6);
+    }
+
+    .sync-status .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #00d9ff;
+      animation: pulse-sync 2s infinite;
+    }
+
+    .sync-status.offline {
+      background: rgba(255, 80, 80, 0.05);
+      border-color: rgba(255, 80, 80, 0.1);
+      color: rgba(255, 80, 80, 0.6);
+    }
+
+    .sync-status.offline .dot {
+      background: #ff5050;
+      animation: none;
+    }
+
+    @keyframes pulse-sync {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
     .user-badge {
@@ -218,7 +250,6 @@
       min-height: 65vh;
     }
 
-    /* greeting / headline */
     .hub-headline {
       margin-bottom: 48px;
       text-align: center;
@@ -242,7 +273,6 @@
       letter-spacing: 0.2px;
     }
 
-    /* ── card grid futuristik ── */
     .kartu-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -261,269 +291,189 @@
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       border: 1px solid rgba(255, 255, 255, 0.03);
-      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.02);
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      overflow: hidden;
+      transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
       cursor: pointer;
-      text-align: center;
+      overflow: hidden;
     }
 
-    /* glass glow border */
     .kartu::before {
       content: '';
       position: absolute;
-      inset: -1px;
-      border-radius: 28px;
-      padding: 1px;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-      transition: opacity 0.4s;
-    }
-
-    .kartu::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 28px;
-      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.03), transparent 65%);
-      pointer-events: none;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(59, 130, 246, 0.15) 0%, transparent 50%);
       opacity: 0;
-      transition: opacity 0.5s;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      z-index: 1;
     }
 
-    .kartu:hover::after {
+    .kartu:hover::before {
       opacity: 1;
     }
 
-    /* ── perbesar kartu saat hover ── */
     .kartu:hover {
-      transform: translateY(-8px) scale(1.04);
-      border-color: rgba(255, 255, 255, 0.06);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 80px rgba(43, 108, 240, 0.04);
-      background: rgba(255, 255, 255, 0.03);
+      transform: translateY(-12px);
+      border-color: rgba(59, 130, 246, 0.2);
+      box-shadow: 0 24px 56px rgba(59, 130, 246, 0.15);
     }
 
-    .kartu .ikon-wrap {
-      width: 70px;
-      height: 70px;
-      margin: 0 auto 18px;
-      border-radius: 24px;
+    .status-chip {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 0.5px;
+      font-weight: 500;
+      z-index: 2;
+    }
+
+    .ikon-wrap {
+      font-size: 48px;
+      margin-bottom: 12px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .judul-kartu {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      margin-bottom: 8px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .desc-kartu {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.35);
+      line-height: 1.4;
+      margin-bottom: 16px;
+      flex: 1;
+      z-index: 2;
+      position: relative;
+    }
+
+    .buka-btn {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      color: rgba(255, 255, 255, 0.5);
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 32px;
-      background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-      border: 1px solid rgba(255,255,255,0.04);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
-      transition: all 0.35s ease;
-      flex-shrink: 0;
-      backdrop-filter: blur(4px);
+      gap: 6px;
+      z-index: 2;
+      position: relative;
     }
 
-    .kartu:hover .ikon-wrap {
-      transform: scale(1.02) translateY(-3px);
-      border-color: rgba(255,255,255,0.08);
-      box-shadow: 0 12px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-
-    .kartu .judul-kartu {
-      font-size: 18px;
-      font-weight: 700;
-      color: #f0f4ff;
-      letter-spacing: -0.2px;
-      margin-bottom: 6px;
-    }
-
-    /* ── deskripsi kecil dibuat lebih terang dan terbaca ── */
-    .kartu .desc-kartu {
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.55);
-      line-height: 1.6;
-      margin-top: 2px;
-      flex: 1;
-      font-weight: 400;
-      letter-spacing: 0.2px;
-    }
-
-    .kartu .buka-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 24px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #fff;
-      border: none;
-      border-radius: 60px;
-      padding: 10px 28px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
-      border: 1px solid rgba(255,255,255,0.04);
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-      transition: all 0.3s ease;
-      align-self: center;
-      font-family: inherit;
-      letter-spacing: 0.3px;
-      backdrop-filter: blur(4px);
-    }
-
-    .kartu:hover .buka-btn {
-      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-      border-color: rgba(255,255,255,0.08);
-      box-shadow: 0 4px 20px rgba(43, 108, 240, 0.08);
-      transform: translateY(-2px);
-    }
-
-    .kartu .buka-btn .arrow {
-      transition: transform 0.3s ease;
+    .arrow {
       display: inline-block;
+      transition: transform 0.2s ease;
     }
 
-    .kartu:hover .buka-btn .arrow {
+    .kartu:hover .arrow {
       transform: translateX(4px);
     }
 
-    /* status chip minimal */
-    .kartu .status-chip {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      font-size: 8px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      padding: 4px 12px;
-      border-radius: 40px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.02);
-      color: rgba(255, 255, 255, 0.15);
-    }
-
-    /* card accent colors (subtle) */
-    .kartu.kerja .status-chip { color: rgba(59, 130, 246, 0.3); border-color: rgba(59, 130, 246, 0.05); }
-    .kartu.laporan .status-chip { color: rgba(139, 92, 246, 0.3); border-color: rgba(139, 92, 246, 0.05); }
-    .kartu.data .status-chip { color: rgba(0, 200, 255, 0.3); border-color: rgba(0, 200, 255, 0.05); }
-
-    .kartu.kerja .ikon-wrap { border-color: rgba(59, 130, 246, 0.1); }
-    .kartu.laporan .ikon-wrap { border-color: rgba(139, 92, 246, 0.1); }
-    .kartu.data .ikon-wrap { border-color: rgba(0, 200, 255, 0.1); }
-
-    /* ── footer ── */
     .footer-site {
       position: relative;
       z-index: 2;
-      flex-shrink: 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 24px 32px 18px;
-      border-top: 1px solid rgba(255, 255, 255, 0.02);
-      background: rgba(7, 10, 20, 0.5);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      color: rgba(255, 255, 255, 0.12);
-      font-size: 12px;
-      font-weight: 400;
-      letter-spacing: 0.3px;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .footer-site .left {
-      color: rgba(255, 255, 255, 0.12);
-    }
-
-    /* ── by hamung 2026 dinaikkan kecerahannya ── */
-    .footer-site .right {
-      color: rgba(255, 255, 255, 0.5);
+      padding: 20px 32px;
       font-size: 11px;
-      letter-spacing: 0.5px;
-      font-weight: 400;
-    }
-
-    .footer-site strong {
       color: rgba(255, 255, 255, 0.15);
-      font-weight: 600;
+      border-top: 1px solid rgba(255, 255, 255, 0.02);
+      margin-top: auto;
     }
 
-    /* ── auth overlay ── */
     #authOverlay {
-      display: none;
       position: fixed;
       inset: 0;
-      z-index: 99999;
-      background: rgba(7, 10, 20, 0.92);
-      backdrop-filter: blur(30px) saturate(1.4);
-      -webkit-backdrop-filter: blur(30px) saturate(1.4);
+      z-index: 100;
+      display: flex;
       align-items: center;
       justify-content: center;
-      font-family: inherit;
-      padding: 20px;
+      background: rgba(7, 10, 20, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      animation: fadeInOverlay 0.3s ease;
+    }
+
+    @keyframes fadeInOverlay {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     #authForm {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      border-radius: 28px;
-      padding: 40px 36px 36px;
+      background: rgba(20, 30, 60, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 32px;
+      padding: 48px 40px;
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(10px);
+      max-width: 420px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
     #authForm h2 {
-      margin: 0 0 6px;
       font-size: 24px;
       font-weight: 700;
-      letter-spacing: -0.3px;
+      margin-bottom: 8px;
       background: linear-gradient(135deg, #f0f4ff, #b7c9ff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
-    #authForm .sub-auth {
-      margin: 0 0 28px;
-      color: rgba(255, 255, 255, 0.25);
+    .sub-auth {
       font-size: 13px;
-      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.3);
+      margin-bottom: 28px;
     }
 
     #authForm label {
       display: block;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 4px;
-      color: rgba(255, 255, 255, 0.25);
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
+      color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
+      margin-top: 16px;
+      margin-bottom: 8px;
     }
 
     #authForm input {
       width: 100%;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 16px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      color: #eef2fb;
       font-size: 14px;
-      background: rgba(255, 255, 255, 0.02);
-      color: #fff;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
       font-family: inherit;
-      outline: none;
+      transition: all 0.2s ease;
     }
 
     #authForm input:focus {
-      border-color: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.02);
+      outline: none;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow: 0 0 24px rgba(59, 130, 246, 0.1);
     }
 
     #authForm input::placeholder {
-      color: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.15);
     }
 
     #authSubmitBtn {
@@ -539,6 +489,7 @@
       transition: all 0.2s ease;
       font-family: inherit;
       box-shadow: 0 4px 24px rgba(43, 108, 240, 0.15);
+      margin-top: 24px;
     }
 
     #authSubmitBtn:hover {
@@ -554,24 +505,20 @@
       text-align: center;
     }
 
-    /* ── responsive ── */
     @media (max-width: 700px) {
       .app-header { padding: 10px 16px; }
       .brand h1 { font-size: 18px; }
       .brand .sub { font-size: 8px; }
       .user-badge { display: none; }
+      .sync-status { display: none; }
       .hub-wrap { padding: 30px 16px 20px; min-height: 50vh; }
       .hub-headline h2 { font-size: 22px; }
       .kartu-grid { grid-template-columns: 1fr; gap: 18px; }
       .kartu { padding: 24px 16px 22px; }
-      .kartu .ikon-wrap { width: 56px; height: 56px; font-size: 26px; }
-      #authForm { padding: 28px 20px 24px; }
+      .ikon-wrap { font-size: 32px; }
+      #authForm { padding: 28px 20px 24px; max-width: 90%; }
       .orb-1, .orb-2, .orb-3 { display: none; }
-      .footer-site {
-        flex-direction: column;
-        text-align: center;
-        padding: 16px;
-      }
+      .footer-site { flex-direction: column; text-align: center; padding: 16px; }
     }
 
     @media (min-width: 701px) and (max-width: 1000px) {
@@ -581,31 +528,31 @@
 </head>
 <body>
 
-  <!-- background -->
   <div class="bg-universe"></div>
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
   <div class="orb orb-3"></div>
 
-  <!-- ─── HEADER ─── -->
   <header class="app-header">
     <div class="brand">
-      <!-- ikon di pojok kiri atas telah dihapus -->
       <div>
         <h1>GAMAS 2026</h1>
         <span class="sub">Futuristik · Neural Hub</span>
       </div>
     </div>
     <div class="header-actions">
+      <div class="sync-status" id="syncStatus">
+        <span class="dot"></span>
+        <span id="syncText">synced</span>
+      </div>
       <span class="user-badge">
-        <span class="avatar">✦</span>
-        <span>Admin</span>
+        <span class="avatar" id="userAvatar">✦</span>
+        <span id="userName">Admin</span>
       </span>
       <button id="btnLogoutHeader" type="button">Keluar</button>
     </div>
   </header>
 
-  <!-- ─── MAIN ─── -->
   <div class="hub-wrap">
     <div class="hub-headline">
       <h2>⚡ command center</h2>
@@ -613,56 +560,45 @@
     </div>
 
     <div class="kartu-grid">
-      <!-- KERJA -->
       <a class="kartu kerja" href="dashboard-kerja.html">
         <span class="status-chip">● online</span>
         <span class="ikon-wrap">🧠</span>
         <div class="judul-kartu">Dashboard Kerja</div>
         <div class="desc-kartu">orkestrasi tugas &amp; alur kerja</div>
-        <span class="buka-btn">
-          akses <span class="arrow">→</span>
-        </span>
+        <span class="buka-btn">akses <span class="arrow">→</span></span>
       </a>
 
-      <!-- LAPORAN -->
       <a class="kartu laporan" href="dashboard-laporan.html">
         <span class="status-chip">● online</span>
         <span class="ikon-wrap">📊</span>
         <div class="judul-kartu">Dashboard Laporan</div>
         <div class="desc-kartu">analitik realtime &amp; insight</div>
-        <span class="buka-btn">
-          akses <span class="arrow">→</span>
-        </span>
+        <span class="buka-btn">akses <span class="arrow">→</span></span>
       </a>
 
-      <!-- DATA -->
       <a class="kartu data" href="dashboard-data.html">
         <span class="status-chip">● online</span>
         <span class="ikon-wrap">🗂️</span>
         <div class="judul-kartu">Dashboard Data</div>
         <div class="desc-kartu">kelola dataset &amp; intelijen</div>
-        <span class="buka-btn">
-          akses <span class="arrow">→</span>
-        </span>
+        <span class="buka-btn">akses <span class="arrow">→</span></span>
       </a>
     </div>
   </div>
 
-  <!-- ─── FOOTER ─── -->
   <footer class="footer-site">
     <span class="left">GAMAS 2026</span>
     <span class="right">by hamung 2026</span>
   </footer>
 
-  <!-- ─── AUTH OVERLAY ─── -->
   <div id="authOverlay">
     <form id="authForm" onsubmit="handleAuthSubmit(event)">
       <input type="hidden" id="authMode" value="login" />
       <h2>🔐 akses terbatas</h2>
       <p class="sub-auth">verifikasi identitas untuk masuk ke command center</p>
 
-      <label for="authUsername">username</label>
-      <input id="authUsername" type="text" autocomplete="username" required placeholder="masukkan username" />
+      <label for="authEmail">email</label>
+      <input id="authEmail" type="email" autocomplete="email" required placeholder="nama@email.com" />
 
       <label for="authPassword">password</label>
       <input id="authPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••" />
@@ -672,9 +608,50 @@
     </form>
   </div>
 
-  <!-- ─── SCRIPTS ─── -->
+  <!-- SUPABASE AUTH SDK (resmi, untuk login/session) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <!-- HYBRID SYNC ENGINE -->
+  <script src="supabase-client.js"></script>
+
   <script>
-    // ── show / hide auth overlay ──
+    // ─── SYNC STATUS UI ───
+    function updateSyncStatus() {
+      if (!gmSync) return;
+      
+      const status = gmSync.getSyncStatus();
+      const statusEl = document.getElementById('syncStatus');
+      const syncText = document.getElementById('syncText');
+      
+      if (status.isOnline) {
+        statusEl.classList.remove('offline');
+        if (status.isSyncing) {
+          syncText.textContent = 'syncing...';
+        } else if (status.pendingOps > 0) {
+          syncText.textContent = `${status.pendingOps} pending`;
+        } else {
+          syncText.textContent = 'synced';
+        }
+      } else {
+        statusEl.classList.add('offline');
+        syncText.textContent = 'offline';
+      }
+    }
+
+    // Update setiap 2 detik
+    setInterval(updateSyncStatus, 2000);
+
+    // Update saat sync selesai
+    document.addEventListener('gm2026-sync-complete', (e) => {
+      updateSyncStatus();
+      console.log(`✨ ${e.detail.count} items synced`);
+    });
+
+    // ─── SUPABASE AUTH CLIENT (resmi) ───
+    // SUPABASE_URL & SUPABASE_KEY sudah dideklarasikan di supabase-client.js
+    const supabaseAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ─── AUTH HANDLERS ───
     function showLoginOverlay(message) {
       const el = document.getElementById('authOverlay');
       if (el) {
@@ -687,91 +664,109 @@
       document.getElementById('authOverlay').style.display = 'none';
     }
 
-    // ── auto-show hub (auth dinonaktifkan untuk preview) ──
+    function paintUser(email) {
+      document.getElementById('userName').textContent = email || 'User';
+      document.getElementById('userAvatar').textContent = (email || 'U')[0].toUpperCase();
+    }
+
+    // Sinkronkan user ID di hybrid sync engine dengan UID Supabase Auth asli
+    // (supaya kolom created_by di database = auth.uid() yang sebenarnya, bukan ID acak)
+    async function syncRealUserId() {
+      const { data: { user } } = await supabaseAuth.auth.getUser();
+      if (user && gmSync) {
+        gmSync.userId = user.id;
+        localStorage.setItem('gm2026_userId', user.id);
+      }
+      return user;
+    }
+
+    // Initialize on load: cek apakah ada session Supabase Auth yang masih aktif
     (async function bootstrap() {
-      showHub();
-      return;
+      const { data: { session } } = await supabaseAuth.auth.getSession();
+
+      if (session && session.user) {
+        paintUser(session.user.email);
+        showHub();
+        // Tunggu gmSync siap (mungkin belum ke-init tepat saat ini), lalu sync UID
+        const waitForSync = setInterval(async () => {
+          if (window.gmSync) {
+            clearInterval(waitForSync);
+            await syncRealUserId();
+            updateSyncStatus();
+          }
+        }, 200);
+      } else {
+        showLoginOverlay();
+      }
     })();
 
-    // ── logout ──
+    // Pantau perubahan status login (login/logout dari tab lain, token refresh, dll)
+    supabaseAuth.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        showLoginOverlay();
+      }
+    });
+
+    // Logout
     document.getElementById('btnLogoutHeader').addEventListener('click', async function() {
       if (!confirm('Yakin mau logout dari GAMAS 2026?')) return;
-      try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-      } catch (e) { /* lanjut reload */ }
+      await supabaseAuth.auth.signOut();
       location.reload();
     });
 
-    // ── auth submit ──
+    // Auth submit — login via Supabase Auth (email + password asli)
     async function handleAuthSubmit(e) {
       e.preventDefault();
-      const mode = document.getElementById('authMode').value;
-      const username = document.getElementById('authUsername').value.trim();
+      const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
       const msgEl = document.getElementById('authMsg');
-      msgEl.style.color = '#f8a5a5';
+      const submitBtn = document.getElementById('authSubmitBtn');
       msgEl.textContent = '';
 
-      if (!username || !password) {
-        msgEl.textContent = 'Isi username dan password.';
+      if (!email || !password) {
+        msgEl.textContent = '❌ Isi email dan password.';
+        msgEl.style.color = '#f8a5a5';
         return;
       }
 
-      try {
-        const url = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
-        const opts = {
-          credentials: 'same-origin',
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        };
-        const res = await fetch(url, opts);
-        if (!res.ok) {
-          let msg = 'Server error (' + res.status + ')';
-          try { const j = await res.json(); if (j.error) msg = j.error; } catch (_) {}
-          throw new Error(msg);
-        }
-        showHub();
-      } catch (err) {
-        msgEl.textContent = '❌ ' + err.message;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Memverifikasi...';
+
+      const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Masuk';
+
+      if (error) {
+        msgEl.textContent = '❌ ' + (error.message === 'Invalid login credentials'
+          ? 'Email atau password salah.'
+          : error.message);
+        msgEl.style.color = '#f8a5a5';
+        return;
       }
+
+      paintUser(data.user.email);
+      showHub();
+      msgEl.textContent = '✅ Login berhasil!';
+      msgEl.style.color = '#10b981';
+      await syncRealUserId();
+      setTimeout(() => updateSyncStatus(), 500);
     }
 
-    // ── service worker — dengan deteksi update otomatis ──
-    // Supaya kalau ada versi baru service-worker.js/HTML di server,
-    // browser langsung pakai versi itu (reload sekali), bukan nyangkut
-    // di cache lama selamanya.
+    // Service worker registration
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
           .then(function(reg) {
-            document.addEventListener('visibilitychange', function() {
-              if (document.visibilityState === 'visible') reg.update().catch(function() {});
-            });
-            reg.addEventListener('updatefound', function() {
-              const baru = reg.installing;
-              if (!baru) return;
-              baru.addEventListener('statechange', function() {
-                if (baru.state === 'installed' && navigator.serviceWorker.controller) {
-                  baru.postMessage('SKIP_WAITING');
-                }
-              });
-            });
+            console.log('✅ Service Worker registered');
           })
           .catch(function(err) {
-            console.warn('Service worker gagal didaftarkan:', err);
+            console.warn('Service Worker failed:', err);
           });
-
-        let sudahReload = false;
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-          if (sudahReload) return;
-          sudahReload = true;
-          location.reload();
-        });
       });
     }
 
-    // ── mouse tracking untuk efek glow ──
+    // Mouse tracking untuk kartu glow
     document.querySelectorAll('.kartu').forEach(card => {
       card.addEventListener('mousemove', (e) => {
         const rect = card.getBoundingClientRect();
