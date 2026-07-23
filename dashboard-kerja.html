@@ -7425,7 +7425,7 @@
         }
 
         // ===== TAB 1 - App-like toolbar: Toggle Tabel/Kartu + Filter Chip =====
-        let tab1ViewMode = localStorage.getItem('tab1ViewMode') === 'card' ? 'card' : 'table';
+        let tab1ViewMode = localStorage.getItem('tab1ViewMode') === 'table' ? 'table' : 'card';
         let tab1QuickFilter = 'semua'; // semua | cash | tempo | lunas | belum_lunas
 
         // Cache peta status faktur (lunas/belum) supaya tidak dihitung ulang
@@ -9459,7 +9459,7 @@
             }
         });
 
-        let tab4ViewMode = localStorage.getItem('tab4ViewMode') === 'card' ? 'card' : 'table';
+        let tab4ViewMode = localStorage.getItem('tab4ViewMode') === 'table' ? 'table' : 'card';
         function applyTab4ViewMode() {
             const isCard = tab4ViewMode === 'card';
             const tableWrap = document.getElementById('tab4TableWrap');
